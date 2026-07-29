@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "821661890528",
+    "project_id": "gsmelaka1925",
+    "storage_bucket": "gsmelaka1925.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:821661890528:android:1f4639a22f0f4bce321d85",
+        "android_client_info": {
+          "package_name": "com.gurdwara.mobileapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDBpX3skwF4CruTyzhaV6XtUdbqf0egcU4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
