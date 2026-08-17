@@ -7,7 +7,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'config/theme.dart';
 import 'services/firebase_options.dart';
@@ -2851,13 +2853,7 @@ class _AboutScreenState extends State<AboutScreen> {
               ),
             if (data.mapUrl.isNotEmpty) const SizedBox(height: 16),
 
-            Text(
-              '© $currentYear Gurdwara Sahib Melaka. All rights reserved.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
-              ),
-              textAlign: TextAlign.center,
-            ),
+            _AboutFooter(currentYear: currentYear),
           ],
         ),
       ),
@@ -2865,7 +2861,75 @@ class _AboutScreenState extends State<AboutScreen> {
   }
 }
 
+/// Footer for the About page: shows the copyright line plus the installed
+/// app version (read from pubspec.yaml at build time via package_info_plus).
+class _AboutFooter extends StatefulWidget {
+  const _AboutFooter({required this.currentYear});
+
+  final int currentYear;
+
+  @override
+  State<_AboutFooter> createState() => _AboutFooterState();
+}
+
+class _AboutFooterState extends State<_AboutFooter> {
+  String? _versionText;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    String? text;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final version = info.version.trim();
+      final build = info.buildNumber.trim();
+      text = build.isEmpty ? version : '$version ($build)';
+    } catch (_) {
+      // If package info can't be read, fall back to showing nothing extra.
+      text = null;
+    }
+    if (mounted) {
+      setState(() {
+        _versionText = text;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
+    );
+
+    return Column(
+      children: [
+        Text(
+          '© ${widget.currentYear} Gurdwara Sahib Melaka. All rights reserved.',
+          style: muted,
+          textAlign: TextAlign.center,
+        ),
+        if (_versionText != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Version $_versionText',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class AboutData {
+
   const AboutData({
     required this.committee,
     required this.address,
