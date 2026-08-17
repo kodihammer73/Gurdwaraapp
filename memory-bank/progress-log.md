@@ -436,7 +436,24 @@ The iOS app looked different from Android:
 - iOS Firebase config now matches the app's bundle ID and uses the correct iOS API key
 - Push notifications and Firebase init will work correctly on iOS
 
+## Session 13: Add Path Filter to iOS Build Workflow (2026-08-17)
+
+### Problem
+Two iOS build actions were running at the same time for commits `002d6ed` and `ccc8cb7`. This was **expected** (two separate pushes each trigger a run), but it highlighted that documentation-only commits (e.g. memory-bank updates) were unnecessarily triggering full iOS builds, wasting Actions minutes.
+
+### Completed
+- [x] Explained to user that the two runs were from two separate pushes (not the duplicate-workflow issue fixed in Session 11)
+- [x] Added `paths` filter to the iOS build workflow (`.github/workflows/ios-build.yml`) for both `push` and `pull_request` triggers
+- [x] Paths that trigger a build: `gurdwara_app/lib/**`, `gurdwara_app/ios/**`, `gurdwara_app/android/**`, `gurdwara_app/pubspec.yaml`, `gurdwara_app/pubspec.lock`, `.github/workflows/ios-build.yml`
+- [x] Committed (commit `a35085b`) and pushed to GitHub (`ccc8cb7..a35085b main -> main`)
+
+### Result
+- Documentation-only commits (e.g. memory-bank updates) no longer trigger an iOS build
+- Only app code changes trigger the build, saving Actions minutes
+- Note: This workflow change itself triggered a build (since the workflow file is in the paths filter) — expected and verifies the workflow still works
+
 ## Development Starting Points
+
 
 
 
