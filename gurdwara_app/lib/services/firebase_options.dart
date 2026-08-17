@@ -43,7 +43,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDBpX3skwF4CruTyzhaV6XtUdbqf0egcU4',
+    apiKey: 'AIzaSyD4TBX5T2fOgk4stWI5naae9PCibYkYQj4',
     appId: '1:821661890528:ios:dcc172800a4cc0a2321d85',
     messagingSenderId: '821661890528',
     projectId: 'gsmelaka1925',
@@ -51,6 +51,7 @@ class DefaultFirebaseOptions {
     authDomain: 'gsmelaka1925.firebaseapp.com',
     iosBundleId: 'com.gsmelaka.mobileapp',
   );
+
 
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'YOUR_WEB_API_KEY',

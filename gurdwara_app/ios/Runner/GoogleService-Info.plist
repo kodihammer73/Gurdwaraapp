@@ -9,7 +9,8 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.gurdwara.mobileapp</string>
+	<string>com.gsmelaka.mobileapp</string>
+
 	<key>PROJECT_ID</key>
 	<string>gsmelaka1925</string>
 	<key>STORAGE_BUCKET</key>
