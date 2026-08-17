@@ -210,10 +210,164 @@ gurdwara_app/
 - Loading spinner shown while fetching, gracefully hides on error
 - All code compiles with zero errors
 
+## Session 5: Daily Push Notification Cron Deployed to MiniPC (2026-07-30)
+
+### Completed
+- [x] Created `backend/cron/daily_event_check.php` - checks events.txt for tomorrow's events and sends push notifications
+- [x] Configured cron job on MiniPC to run daily at 11:00 AM
+- [x] Deployed PHP backend files (`register_device.php`, `send_push.php`, `daily_event_check.php`) to MiniPC
+- [x] Configured FCM Server Key in `send_push.php`
+- [x] Cron job logs to `/var/log/gurdwara_push.log`
+- [x] Daily push notification system is live and running
+
+### Cron Setup on MiniPC
+```bash
+# Runs daily at 11:00 AM
+0 11 * * * /usr/bin/php /var/www/html/api/cron/daily_event_check.php >> /var/log/gurdwara_push.log 2>&1
+```
+
+### How It Works
+1. Cron triggers `daily_event_check.php` at 11:00 AM daily
+2. Script reads `events.txt` and checks for events happening tomorrow
+3. If tomorrow events are found, sends push notifications via `send_push.php` to all registered devices
+4. Results are logged to `/var/log/gurdwara_push.log`
+
+### Files Deployed to MiniPC
+- `api/register_device.php` - FCM token registration endpoint
+- `api/send_push.php` - Push notification sender (FCM Server Key configured)
+- `cron/daily_event_check.php` - Daily event check cron script
+
+## Session 6: Push Notification Tab Added to Website Admin Panel (2026-07-30)
+
+### Completed
+- [x] Added "Push Notification" tab (Tab 7) to website admin panel (`admin.php`)
+- [x] Manual push form with title, body, type dropdown, and live preview
+- [x] PHP handler calls `send_push.php` via cURL (auto-detects localhost vs production)
+- [x] Deployed `send_push.php` and `daily_event_check.php` to website's `api/` and `cron/` directories
+- [x] Updated website memory bank with all changes
+
+### Key Changes
+1. **`admin.php`** (modified): Added Tab 7 with sidebar nav link, PHP handler, HTML form, live preview JS, and info sidebar
+2. **`api/send_push.php`** (deployed to website): FCM V1 push notification sender
+3. **`cron/daily_event_check.php`** (deployed to website): Daily cron script for event reminders
+
+### Result
+- Admin can now send push notifications to all registered app devices directly from the admin panel
+- Live preview shows exactly how the notification will appear on a device
+- Works on both localhost (XAMPP) and production (gurdwarasahibmelaka.com)
+- Same FCM infrastructure as the automatic daily event reminder
+
+## Session 7: Bug Fixes & Performance Improvements (2026-08-07)
+
+### Completed
+- [x] Extracted shared `_fetchNextBarsi()` top-level function — eliminated duplicate barsi fetch logic between `_BarsiQuickCard` and `_BarsiFullContent`
+- [x] Deleted dead `_BarsiQuickCard` widget (was never mounted, caused double network requests)
+- [x] Fixed hardcoded `monthNames[4]` (May) — now uses `event.month` field derived from parsed data
+- [x] Added optional 5th `|month` token to `barsidates.txt` parser (defaults to 5/May if absent, future-proof)
+- [x] Parallelised gallery HTTP requests using `Future.wait()` — 17 year requests per category now fire simultaneously instead of sequentially
+- [x] Gallery load time reduced from ~30s (85 sequential requests) to ~5s (5 parallel batches of 17)
+
+### Key Changes
+1. **`_fetchNextBarsi()`** — moved to top-level shared function; `_BarsiEvent` now has `month` field
+2. **`_BarsiQuickCard`** — deleted (dead code, ~250 lines removed)
+3. **`_BarsiFullContent`** — now calls shared `_fetchNextBarsi()`, date display uses `event.month - 1` index
+4. **`_GalleryScreenState._loadGallery()`** — inner loop replaced with `Future.wait(yearsToCheck.map(...))` with `eagerError: false`
+
+### Performance Impact
+- **Before**: Gallery = 5 categories × 17 years = 85 sequential awaits (~30s on mobile)
+- **After**: Gallery = 5 categories × 1 parallel batch each = ~5s total
+
+## Session 8: Google Play Store Package Migration (2026-08-10)
+
+### Completed
+- [x] Updated `google-services.json` to new Firebase project `gsmelaka1925` with package `com.gsmelaka.mobileapp`
+- [x] Updated `build.gradle.kts`: namespace/applicationId → `com.gsmelaka.mobileapp`, compileSdk/targetSdk → 36, added Play Store signing config
+- [x] Fixed `firebase_options.dart`: corrected Android appId to match google-services.json, updated storageBucket to `gsmelaka1925.firebasestorage.app`, fixed iosBundleId → `com.gsmelaka.mobileapp`
+- [x] Created new `MainActivity.kt` at correct path `kotlin/com/gsmelaka/mobileapp/` with updated package declaration
+- [x] Deleted old `MainActivity.kt` at `kotlin/com/gurdwara/mobileapp/`
+- [x] Verified `flutter pub get` resolves successfully
+
+### Key Changes
+- **Package ID**: `com.gurdwara.mobileapp` → `com.gsmelaka.mobileapp`
+- **Firebase project**: `gsmelaka1925` (unchanged, but appId corrected)
+- **Android build**: compileSdk/targetSdk bumped to 36, signing config added for Play Store release
+- **`key.properties`** must exist at `android/key.properties` with keystore credentials for release build
+
+### Next Steps for Play Store Upload
+1. Ensure `android/key.properties` is configured with your keystore path and passwords
+2. Run `flutter build appbundle --release` to generate the AAB
+3. Upload the AAB from `build/app/outputs/bundle/release/app-release.aab` to Google Play Console
+
+## Session 9: Force Update Feature (2026-08-13)
+
+### Completed
+- [x] Created backend version config file (`website/app_version.json`) with minimum_version, latest_version, play_store_url, force_update flag, and update_message
+- [x] Added `package_info_plus` dependency to pubspec.yaml to read installed app version at runtime
+- [x] Created `lib/services/version_check_service.dart` — fetches version config from website, compares installed version against minimum required version using semantic version comparison
+- [x] Created `lib/widgets/force_update_dialog.dart` — branded gradient dialog (periwinkle→purple) with "Update Now" button that opens the Play Store via url_launcher
+- [x] Wired version check into `main.dart` startup — `GurdwaraApp` is now a `ConsumerStatefulWidget` that runs the version check on init and shows the dialog if an update is required
+- [x] Force update dialog is non-dismissible (barrier locked, back button blocked via PopScope) when `force_update` is true
+- [x] Optional "Later" button shown when `force_update` is false (recommended update mode)
+- [x] Fail-open behaviour: on any network/parse error, the app continues normally (no update prompt)
+- [x] `flutter pub get` resolves successfully; `dart analyze` shows zero errors
+
+### Key Changes
+1. **`website/app_version.json`** (new): Hosted at `https://www.gurdwarasahibmelaka.com/app_version.json` — the single source of truth for the minimum required version. Admin edits this file to force updates without rebuilding the app.
+2. **`pubspec.yaml`**: Added `package_info_plus: ^8.0.0`
+3. **`lib/services/version_check_service.dart`** (new): `VersionCheckService.checkForUpdate()` returns a `VersionCheckResult` with `updateRequired`, `forceUpdate`, `latestVersion`, `minimumVersion`, `playStoreUrl`, `updateMessage`. Uses semantic version comparison (major.minor.patch).
+4. **`lib/widgets/force_update_dialog.dart`** (new): `showForceUpdateDialog(context, result)` — branded dialog matching the app's immersive gradient aesthetic. Non-dismissible when forced.
+5. **`lib/main.dart`**: `GurdwaraApp` converted from `ConsumerWidget` to `ConsumerStatefulWidget`; `_checkForUpdate()` runs on startup and shows the dialog after the first frame.
+
+### How to Use (Admin)
+1. To force an update, edit `app_version.json` on the website:
+   - Set `minimum_version` to the new required version (e.g. `"1.0.2"`)
+   - Set `force_update` to `true`
+   - Set `latest_version` and `update_message` as desired
+2. Users on versions below `minimum_version` will see the non-dismissible update dialog on next app launch.
+3. To make it a recommended (dismissible) update, set `force_update` to `false`.
+
+### Version Bump & AAB Build (2026-08-13)
+- [x] Bumped app version from `1.0.1+2` → `1.0.2+3` in `pubspec.yaml`
+- [x] Verified `android/key.properties` and `upload-keystore.jks` exist for Play Store release signing
+- [x] Compiled release AAB successfully via `flutter build appbundle --release`
+- [x] Output: `build/app/outputs/bundle/release/app-release.aab` (ready to upload to Google Play Console)
+
+### Next Steps
+1. Deploy `app_version.json` to the MiniPC website root
+2. Upload `app-release.aab` (v1.0.2+3) to Google Play Console
+3. Test force update end-to-end (install old version, bump minimum_version, verify dialog appears)
+
+
+## Gallery Performance Optimization (2026-08-13)
+
+### Problem
+The Gallery tab was slow to load and scrolled sluggishly because the app ignored the server-side WebP thumbnails (`thumb` field) returned by `ajax_gallery.php` and instead fetched every full-resolution original image for the grid.
+
+### Changes Made (lib/main.dart)
+- [x] Added `_GalleryImage` model holding both `thumbUrl` (lightweight WebP) and `fullUrl` (full-resolution)
+- [x] Updated `_loadGallery` to parse both `item['thumb']` and `item['src']` from the API, falling back to the full URL when no thumbnail is provided
+- [x] Changed `_GalleryData.categoryImages` to `Map<String, Set<_GalleryImage>>`
+- [x] Added `_filteredImages()` helper to resolve the selected category/year image list
+- [x] Converted the non-lazy `GridView.count` to a lazy `SliverGrid` (only builds tiles near the viewport, so off-screen images aren't fetched until scrolled into view)
+- [x] Updated `_GalleryUrlItem` to use `thumbUrl` for the grid with `memCacheWidth/Height: 400` decode hints, and `fullUrl` for the full-screen viewer with `memCacheWidth/Height: 1600`
+- [x] Updated the empty-state sample grid to use `_GalleryImage` objects
+- [x] Verified with `flutter analyze` (no new errors; only pre-existing warnings remain)
+
+### Result
+Gallery now loads lightweight WebP thumbnails in the grid, decodes them at a small size, and only fetches full-resolution images when a user taps to view them full-screen. Scrolling is smooth and initial load is much faster.
+
+### Version Bump & AAB Build (2026-08-13)
+- [x] Bumped app version from `1.0.2+3` → `1.0.3+4` in `pubspec.yaml`
+- [x] Compiled release AAB successfully via `flutter build appbundle --release`
+- [x] Output: `build/app/outputs/bundle/release/app-release.aab` (58.1MB, ready to upload to Google Play Console)
+
 ## Development Starting Points
+
 1. **Android Development**: Use `flutter run` on Windows with Android emulator
+
 2. **Dependency Management**: Update pubspec.yaml with required packages
 3. **UI Implementation**: Start with main.dart and create base screens
 4. **GitHub Integration**: Connect local repo to GitHub for CI/CD testing
 5. **Push Notifications**: Deploy PHP backend files to mini PC, configure FCM key, rebuild APK
-</content>
+
+

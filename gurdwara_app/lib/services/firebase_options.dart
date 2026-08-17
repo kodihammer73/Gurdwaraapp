@@ -35,10 +35,10 @@ class DefaultFirebaseOptions {
   
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDBpX3skwF4CruTyzhaV6XtUdbqf0egcU4',
-    appId: '1:821661890528:android:1f4639a22f0f4bce321d85',
+    appId: '1:821661890528:android:67ce0090711e2f48321d85',
     messagingSenderId: '821661890528',
     projectId: 'gsmelaka1925',
-    storageBucket: 'gsmelaka1925.appspot.com',
+    storageBucket: 'gsmelaka1925.firebasestorage.app',
     authDomain: 'gsmelaka1925.firebaseapp.com',
   );
 
@@ -49,7 +49,7 @@ class DefaultFirebaseOptions {
     projectId: 'gsmelaka1925',
     storageBucket: 'gsmelaka1925.appspot.com',
     authDomain: 'gsmelaka1925.firebaseapp.com',
-    iosBundleId: 'com.gurdwara.mobileapp', // REPLACE with your bundle ID
+    iosBundleId: 'com.gsmelaka.mobileapp',
   );
 
   static const FirebaseOptions web = FirebaseOptions(

@@ -1,5 +1,15 @@
 // android/app/build.gradle.kts
 
+import java.util.Properties
+import java.io.FileInputStream
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
 plugins {
     id("com.android.application")
     id("dev.flutter.flutter-gradle-plugin")
@@ -7,7 +17,7 @@ plugins {
 }
 
 android {
-    namespace = "com.gurdwara.mobileapp"
+    namespace = "com.gsmelaka.mobileapp"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -18,16 +28,30 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.gurdwara.mobileapp"  // Match your google-services.json
+        applicationId = "com.gsmelaka.mobileapp"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    // Release signing key for Google Play Store
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+            storeFile = keystoreProperties["storeFile"]?.let { file(it) }
+            storePassword = keystoreProperties["storePassword"] as String
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
+
+            // Optional: enable optimization for Play Store
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
@@ -43,8 +67,9 @@ flutter {
 }
 
 dependencies {
-    // ⭐ UPDATE THIS to 2.1.4 or higher
+
+    // Desugaring support
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    
+
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 }

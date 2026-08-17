@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:821661890528:android:1f4639a22f0f4bce321d85",
+        "mobilesdk_app_id": "1:821661890528:android:67ce0090711e2f48321d85",
         "android_client_info": {
-          "package_name": "com.gurdwara.mobileapp"
+          "package_name": "com.gsmelaka.mobileapp"
         }
       },
       "oauth_client": [],

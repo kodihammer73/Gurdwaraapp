@@ -1,4 +1,4 @@
-package com.gurdwara.mobileapp
+package com.gsmelaka.mobileapp
 
 import io.flutter.embedding.android.FlutterActivity
 

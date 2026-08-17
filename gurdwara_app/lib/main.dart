@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +12,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'config/theme.dart';
 import 'services/firebase_options.dart';
 import 'services/notification_service.dart';
+import 'services/version_check_service.dart';
+import 'widgets/force_update_dialog.dart';
 import 'widgets/immersive_category_grid.dart';
+
 
 // ⭐ ADD THESE GLOBAL CONSTANTS (they were missing)
 const String _siteBaseUrl = 'https://www.gurdwarasahibmelaka.com';
@@ -59,11 +63,37 @@ void main() async {
   runApp(const ProviderScope(child: GurdwaraApp()));
 }
 
-class GurdwaraApp extends ConsumerWidget {
+class GurdwaraApp extends ConsumerStatefulWidget {
   const GurdwaraApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GurdwaraApp> createState() => _GurdwaraAppState();
+}
+
+class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
+  final VersionCheckService _versionCheckService = VersionCheckService();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkForUpdate();
+  }
+
+  /// Runs the version check on startup and shows the force-update dialog
+  /// if the installed version is below the minimum required version.
+  Future<void> _checkForUpdate() async {
+    final result = await _versionCheckService.checkForUpdate();
+    if (!mounted || !result.updateRequired) return;
+
+    // Show the dialog after the first frame so the app UI is ready.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showForceUpdateDialog(context, result);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Gurdwara Sahib Melaka',
       debugShowCheckedModeBanner: false,
@@ -74,6 +104,8 @@ class GurdwaraApp extends ConsumerWidget {
     );
   }
 }
+
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -503,249 +535,83 @@ class _ImmersiveInfoCard extends StatelessWidget {
   }
 }
 
-/// A widget that displays a countdown to the next Barsi from the website's barsidates.txt
-class _BarsiQuickCard extends StatefulWidget {
-  const _BarsiQuickCard();
+// ---------------------------------------------------------------------------
+// Shared barsi fetch logic — single source of truth used by _BarsiFullContent
+// ---------------------------------------------------------------------------
 
-  @override
-  State<_BarsiQuickCard> createState() => _BarsiQuickCardState();
-}
+/// Fetches and parses the next upcoming Barsi event from the website's
+/// barsidates.txt. Shared by all Barsi UI widgets to avoid duplicate requests.
+Future<_BarsiEvent> _fetchNextBarsi() async {
+  const barsidatesUrl = '$_siteBaseUrl/barsidates.txt';
+  final response = await _dio.get<String>(barsidatesUrl);
+  final text = response.data ?? '';
+  final lines = text.trim().split('\n');
+  final now = DateTime.now();
+  _BarsiEvent? targetEvent;
 
-class _BarsiQuickCardState extends State<_BarsiQuickCard> {
-  static const String _barsidatesUrl = '$_siteBaseUrl/barsidates.txt';
+  for (final line in lines) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) continue;
+    final parts = trimmed.split('|');
+    if (parts.length < 4) continue;
 
-  late Future<_BarsiEvent> _future;
+    final year = int.tryParse(parts[0].trim());
+    final startDay = int.tryParse(parts[1].trim());
+    final endDay = int.tryParse(parts[2].trim());
+    final ordinal = parts[3].trim();
+    // Optional month field (5th token); defaults to May (5) if absent
+    final month = parts.length > 4 ? (int.tryParse(parts[4].trim()) ?? 5) : 5;
 
-  @override
-  void initState() {
-    super.initState();
-    _future = _fetchNextBarsi();
+    if (year == null || startDay == null || endDay == null) continue;
+
+    final startDate = DateTime(year, month, startDay);
+    final endDate = DateTime(year, month, endDay + 1);
+
+    if (now.isBefore(endDate)) {
+      targetEvent = _BarsiEvent(
+        ordinal: ordinal,
+        startDay: startDay,
+        endDay: endDay,
+        year: year,
+        month: month,
+        startDate: startDate,
+        endDate: endDate,
+      );
+      break;
+    }
   }
 
-  Future<_BarsiEvent> _fetchNextBarsi() async {
-    final response = await _dio.get<String>(_barsidatesUrl);
-    final text = response.data ?? '';
-    final lines = text.trim().split('\n');
-    final now = DateTime.now();
-    _BarsiEvent? targetEvent;
-
-    for (final line in lines) {
+  // If all events have passed, fall back to the last entry
+  if (targetEvent == null && lines.isNotEmpty) {
+    for (final line in lines.reversed) {
       final trimmed = line.trim();
       if (trimmed.isEmpty) continue;
       final parts = trimmed.split('|');
       if (parts.length < 4) continue;
-
       final year = int.tryParse(parts[0].trim());
       final startDay = int.tryParse(parts[1].trim());
       final endDay = int.tryParse(parts[2].trim());
       final ordinal = parts[3].trim();
-
+      final month = parts.length > 4 ? (int.tryParse(parts[4].trim()) ?? 5) : 5;
       if (year == null || startDay == null || endDay == null) continue;
-
-      // Barsi is always in May (month 5)
-      final startDate = DateTime(year, 5, startDay);
-      final endDate = DateTime(year, 5, endDay + 1); // end of endDay
-
-      if (now.isBefore(endDate)) {
-        targetEvent = _BarsiEvent(
-          ordinal: ordinal,
-          startDay: startDay,
-          endDay: endDay,
-          year: year,
-          startDate: startDate,
-          endDate: endDate,
-        );
-        break;
-      }
+      targetEvent = _BarsiEvent(
+        ordinal: ordinal,
+        startDay: startDay,
+        endDay: endDay,
+        year: year,
+        month: month,
+        startDate: DateTime(year, month, startDay),
+        endDate: DateTime(year, month, endDay + 1),
+      );
+      break;
     }
-
-    // If all events passed, use the last one
-    if (targetEvent == null && lines.isNotEmpty) {
-      for (final line in lines.reversed) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty) continue;
-        final parts = trimmed.split('|');
-        if (parts.length < 4) continue;
-        final year = int.tryParse(parts[0].trim());
-        final startDay = int.tryParse(parts[1].trim());
-        final endDay = int.tryParse(parts[2].trim());
-        final ordinal = parts[3].trim();
-        if (year == null || startDay == null || endDay == null) continue;
-        targetEvent = _BarsiEvent(
-          ordinal: ordinal,
-          startDay: startDay,
-          endDay: endDay,
-          year: year,
-          startDate: DateTime(year, 5, startDay),
-          endDate: DateTime(year, 5, endDay + 1),
-        );
-        break;
-      }
-    }
-
-    if (targetEvent == null) {
-      throw Exception('No barsi dates available.');
-    }
-
-    return targetEvent;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<_BarsiEvent>(
-      future: _future,
-      builder: (context, snapshot) {
-        final theme = Theme.of(context);
-        final bgColor = theme.colorScheme.primaryContainer;
-        final fgColor = theme.colorScheme.onPrimaryContainer;
-        final borderColor = theme.colorScheme.primary.withValues(alpha: 0.35);
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Card(
-            margin: EdgeInsets.zero,
-            color: bgColor,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              side: BorderSide(color: borderColor),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.all(12),
-              child: Center(
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            ),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Card(
-            margin: EdgeInsets.zero,
-            color: bgColor,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              side: BorderSide(color: borderColor),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Barsi',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: fgColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Unavailable',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: fgColor.withValues(alpha: 0.75),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        final event = snapshot.data!;
-        final now = DateTime.now();
-        final isActive = now.isAfter(event.startDate) && now.isBefore(event.endDate);
-        final isPassed = now.isAfter(event.endDate);
-
-        String countdownText;
-        if (isActive) {
-          countdownText = 'Ongoing now!';
-        } else if (isPassed) {
-          countdownText = 'See you next year!';
-        } else {
-          final diff = event.startDate.difference(now);
-          final days = diff.inDays;
-          final hours = diff.inHours % 24;
-          if (days == 0 && hours == 0) {
-            countdownText = 'Today!';
-          } else if (days == 0) {
-            countdownText = 'Today, ${hours}h left';
-          } else if (days == 1) {
-            countdownText = '1 day, ${hours}h left';
-          } else {
-            countdownText = '$days days, ${hours}h left';
-          }
-        }
-
-        final monthNames = [
-          'January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'
-        ];
-
-        return Card(
-          margin: EdgeInsets.zero,
-          color: bgColor,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            side: BorderSide(color: borderColor),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          shadowColor: theme.colorScheme.primary.withValues(alpha: 0.20),
-          child: InkWell(
-            onTap: () {},
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '${event.ordinal} Barsi',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: fgColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${event.startDay} - ${event.endDay} ${monthNames[4]} ${event.year}',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: fgColor.withValues(alpha: 0.85),
-                      fontWeight: FontWeight.w600,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    countdownText,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: fgColor.withValues(alpha: 0.75),
-                      fontWeight: FontWeight.w500,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
+  if (targetEvent == null) {
+    throw Exception('No barsi dates available.');
   }
+
+  return targetEvent;
 }
 
 /// Full-content widget for the Barsi immersive card.
@@ -769,72 +635,6 @@ class _BarsiFullContentState extends State<_BarsiFullContent> {
   void initState() {
     super.initState();
     _future = _fetchNextBarsi();
-  }
-
-  Future<_BarsiEvent> _fetchNextBarsi() async {
-    final response = await _dio.get<String>(_barsidatesUrl);
-    final text = response.data ?? '';
-    final lines = text.trim().split('\n');
-    final now = DateTime.now();
-    _BarsiEvent? targetEvent;
-
-    for (final line in lines) {
-      final trimmed = line.trim();
-      if (trimmed.isEmpty) continue;
-      final parts = trimmed.split('|');
-      if (parts.length < 4) continue;
-
-      final year = int.tryParse(parts[0].trim());
-      final startDay = int.tryParse(parts[1].trim());
-      final endDay = int.tryParse(parts[2].trim());
-      final ordinal = parts[3].trim();
-
-      if (year == null || startDay == null || endDay == null) continue;
-
-      final startDate = DateTime(year, 5, startDay);
-      final endDate = DateTime(year, 5, endDay + 1);
-
-      if (now.isBefore(endDate)) {
-        targetEvent = _BarsiEvent(
-          ordinal: ordinal,
-          startDay: startDay,
-          endDay: endDay,
-          year: year,
-          startDate: startDate,
-          endDate: endDate,
-        );
-        break;
-      }
-    }
-
-    if (targetEvent == null && lines.isNotEmpty) {
-      for (final line in lines.reversed) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty) continue;
-        final parts = trimmed.split('|');
-        if (parts.length < 4) continue;
-        final year = int.tryParse(parts[0].trim());
-        final startDay = int.tryParse(parts[1].trim());
-        final endDay = int.tryParse(parts[2].trim());
-        final ordinal = parts[3].trim();
-        if (year == null || startDay == null || endDay == null) continue;
-        targetEvent = _BarsiEvent(
-          ordinal: ordinal,
-          startDay: startDay,
-          endDay: endDay,
-          year: year,
-          startDate: DateTime(year, 5, startDay),
-          endDate: DateTime(year, 5, endDay + 1),
-        );
-        break;
-      }
-    }
-
-    if (targetEvent == null) {
-      throw Exception('No barsi dates available.');
-    }
-
-    return targetEvent;
   }
 
   @override
@@ -916,7 +716,7 @@ class _BarsiFullContentState extends State<_BarsiFullContent> {
               ),
             ),
             const SizedBox(height: 2),
-            // Date range
+            // Date range — uses event.month (not hardcoded index 4)
             AnimatedBuilder(
               animation: widget.parallax,
               builder: (context, child) {
@@ -926,7 +726,7 @@ class _BarsiFullContentState extends State<_BarsiFullContent> {
                 );
               },
               child: Text(
-                '${event.startDay} - ${event.endDay} ${monthNames[4]} ${event.year}',
+                '${event.startDay} - ${event.endDay} ${monthNames[event.month - 1]} ${event.year}',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.85),
                   fontSize: 12,
@@ -986,6 +786,7 @@ class _BarsiEvent {
     required this.startDay,
     required this.endDay,
     required this.year,
+    required this.month,
     required this.startDate,
     required this.endDate,
   });
@@ -994,6 +795,8 @@ class _BarsiEvent {
   final int startDay;
   final int endDay;
   final int year;
+  /// Calendar month (1–12). Defaults to 5 (May) when not specified in data.
+  final int month;
   final DateTime startDate;
   final DateTime endDate;
 }
@@ -1767,7 +1570,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
   Future<_GalleryData> _loadGallery() async {
     final categories = <String>[];
-    final categoryImages = <String, Set<String>>{};
+    final categoryImages = <String, Set<_GalleryImage>>{};
     final categoryYears = <String, List<int>>{};
 
     Future<_GalleryPageResult?> fetchGalleryPage(String event, {int? year}) async {
@@ -1783,51 +1586,76 @@ class _GalleryScreenState extends State<GalleryScreen> {
         return null;
       }
 
-      final images = <String>[];
+      final images = <_GalleryImage>[];
       final imagesList = data['images'] as List<dynamic>?;
       if (imagesList != null) {
         for (final item in imagesList) {
           if (item is Map<String, dynamic>) {
             final src = (item['src'] ?? '').toString().trim();
             if (src.isEmpty) continue;
+
+            // Resolve the full-resolution URL
             final lower = src.toLowerCase();
+            final String fullUrl;
             if (lower.startsWith('http://') || lower.startsWith('https://')) {
-              images.add(src);
+              fullUrl = src;
             } else {
               final path = src.startsWith('/') ? src : '/$src';
-              images.add('$_siteBaseUrl$path');
+              fullUrl = '$_siteBaseUrl$path';
             }
+
+            // Resolve the lightweight thumbnail URL (server-side WebP via thumb.php)
+            final thumbRaw = (item['thumb'] ?? '').toString().trim();
+            final String thumbUrl;
+            if (thumbRaw.isEmpty) {
+              // Fall back to the full URL if no thumbnail is provided
+              thumbUrl = fullUrl;
+            } else if (thumbRaw.startsWith('http://') || thumbRaw.startsWith('https://')) {
+              thumbUrl = thumbRaw;
+            } else {
+              final thumbPath = thumbRaw.startsWith('/') ? thumbRaw : '/$thumbRaw';
+              thumbUrl = '$_siteBaseUrl$thumbPath';
+            }
+
+            images.add(_GalleryImage(thumbUrl: thumbUrl, fullUrl: fullUrl));
           }
         }
       }
       return _GalleryPageResult(images: images);
     }
 
-    final candidates = _categoryOrder;
+    const yearsToCheck = [
 
-    for (final category in candidates) {
-      final yearSet = <int>{};
-      final imageSet = <String>{};
+      2026, 2025, 2024, 2023, 2022, 2021, 2020,
+      2019, 2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011, 2010,
+    ];
 
+    // Process categories sequentially but fetch all years for each category in parallel
+    for (final category in _categoryOrder) {
       categories.add(category);
+      final imageSet = <_GalleryImage>{};
+      final yearSet = <int>{};
       categoryImages[category] = imageSet;
       categoryYears[category] = [];
 
-      // Match the years available on the website's gallery dropdown
-      for (final year in [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011, 2010]) {
-        final page = await fetchGalleryPage(category, year: year);
-        if (page == null || page.images.isEmpty) {
-          continue;
-        }
-        for (final src in page.images) {
-          imageSet.add(src);
-          final match = RegExp(r'/(\d{4})/').firstMatch(src);
+      // Fire all year requests for this category simultaneously
+      final results = await Future.wait(
+        yearsToCheck.map((year) => fetchGalleryPage(category, year: year)),
+        eagerError: false,
+      );
+
+      for (final page in results) {
+        if (page == null || page.images.isEmpty) continue;
+        for (final image in page.images) {
+          imageSet.add(image);
+          final match = RegExp(r'/(\d{4})/').firstMatch(image.fullUrl);
           if (match != null) {
             final yr = int.tryParse(match.group(1) ?? '') ?? 0;
             if (yr != 0) yearSet.add(yr);
           }
         }
       }
+
 
       final years = yearSet.toList()..sort((a, b) => b.compareTo(a));
       categoryYears[category] = years;
@@ -1840,8 +1668,27 @@ class _GalleryScreenState extends State<GalleryScreen> {
     );
   }
 
+  /// Returns the list of gallery images for the currently selected category,
+  /// filtered by the selected year (if any).
+  List<_GalleryImage> _filteredImages(_GalleryData data) {
+    final category = _selectedCategory;
+    if (category == null) return const [];
+
+    final all = data.categoryImages[category] ?? const <_GalleryImage>{};
+    final selectedYear = _selectedYear[category];
+
+    if (selectedYear == null || selectedYear == 0) {
+      return all.toList();
+    }
+
+    return all
+        .where((image) => image.fullUrl.contains('/$selectedYear/'))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+
     return RefreshIndicator(
       onRefresh: _refresh,
       child: FutureBuilder<_GalleryData>(
@@ -1929,11 +1776,32 @@ class _GalleryScreenState extends State<GalleryScreen> {
                             crossAxisSpacing: 8,
                             childAspectRatio: 16 / 9,
                             children: [
-                              _GalleryUrlItem(url: '$_siteBaseUrl/web/logo.png'),
-                              _GalleryUrlItem(url: '$_siteBaseUrl/web/favicon.png'),
-                              _GalleryUrlItem(url: 'https://picsum.photos/600/400?random=1'),
-                              _GalleryUrlItem(url: 'https://picsum.photos/600/400?random=2'),
+                              _GalleryUrlItem(
+                                image: _GalleryImage(
+                                  thumbUrl: '$_siteBaseUrl/web/logo.png',
+                                  fullUrl: '$_siteBaseUrl/web/logo.png',
+                                ),
+                              ),
+                              _GalleryUrlItem(
+                                image: _GalleryImage(
+                                  thumbUrl: '$_siteBaseUrl/web/favicon.png',
+                                  fullUrl: '$_siteBaseUrl/web/favicon.png',
+                                ),
+                              ),
+                              _GalleryUrlItem(
+                                image: _GalleryImage(
+                                  thumbUrl: 'https://picsum.photos/600/400?random=1',
+                                  fullUrl: 'https://picsum.photos/600/400?random=1',
+                                ),
+                              ),
+                              _GalleryUrlItem(
+                                image: _GalleryImage(
+                                  thumbUrl: 'https://picsum.photos/600/400?random=2',
+                                  fullUrl: 'https://picsum.photos/600/400?random=2',
+                                ),
+                              ),
                             ],
+
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -1961,7 +1829,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate(
                     [
@@ -2066,43 +1934,63 @@ class _GalleryScreenState extends State<GalleryScreen> {
                           },
                         ),
                       const SizedBox(height: 16),
-                      if (_selectedCategory != null)
-                        GridView.count(
-                          crossAxisCount: 2,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                          childAspectRatio: 16 / 9,
-                          children: [
-                            for (final url in data.categoryImages[_selectedCategory] ?? const <String>{})
-                              if (_selectedYear[_selectedCategory] == null || _selectedYear[_selectedCategory] == 0)
-                                _GalleryUrlItem(url: url)
-                              else if (url.contains('/${_selectedYear[_selectedCategory]}/'))
-                                _GalleryUrlItem(url: url),
-                          ],
-                        ),
-                      if (_selectedCategory != null && (data.categoryImages[_selectedCategory] ?? <String>{}).isEmpty)
-                        Text(
-                          'No images in this category.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
                     ],
                   ),
                 ),
               ),
+              // Lazy-loading grid: only builds tiles that are near the viewport,
+              // so off-screen images are not fetched until scrolled into view.
+              if (_selectedCategory != null)
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  sliver: SliverGrid(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                      childAspectRatio: 16 / 9,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final images = _filteredImages(data);
+                        return _GalleryUrlItem(image: images[index]);
+                      },
+                      childCount: _filteredImages(data).length,
+                    ),
+                  ),
+                ),
+              if (_selectedCategory != null && _filteredImages(data).isEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'No images in this category.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                ),
             ],
           );
+
         },
       ),
     );
   }
 }
 
+/// A single gallery image with a lightweight thumbnail URL (for the grid)
+/// and the full-resolution URL (for the full-screen viewer).
+class _GalleryImage {
+  const _GalleryImage({required this.thumbUrl, required this.fullUrl});
+
+  final String thumbUrl;
+  final String fullUrl;
+}
+
 class _GalleryPageResult {
   const _GalleryPageResult({required this.images});
 
-  final List<String> images;
+  final List<_GalleryImage> images;
 }
 
 class _GalleryData {
@@ -2113,9 +2001,10 @@ class _GalleryData {
   });
 
   final List<String> categories;
-  final Map<String, Set<String>> categoryImages;
+  final Map<String, Set<_GalleryImage>> categoryImages;
   final Map<String, List<int>> categoryYears;
 }
+
 
 String _capitalize(String input) {
   if (input.isEmpty) return input;
@@ -2125,9 +2014,9 @@ String _capitalize(String input) {
 }
 
 class _GalleryUrlItem extends StatelessWidget {
-  const _GalleryUrlItem({required this.url});
+  const _GalleryUrlItem({required this.image});
 
-  final String url;
+  final _GalleryImage image;
 
   void _openFullScreen(BuildContext context) {
     showGeneralDialog<void>(
@@ -2141,7 +2030,8 @@ class _GalleryUrlItem extends StatelessWidget {
           color: Colors.transparent,
           child: Stack(
             children: [
-              // Full-screen image with InteractiveViewer for pinch-to-zoom
+              // Full-screen image with InteractiveViewer for pinch-to-zoom.
+              // Uses the full-resolution URL here (only fetched on tap).
               Positioned.fill(
                 child: GestureDetector(
                   onTap: () => Navigator.of(dialogContext).pop(),
@@ -2151,44 +2041,42 @@ class _GalleryUrlItem extends StatelessWidget {
                     panEnabled: true,
                     boundaryMargin: const EdgeInsets.all(80),
                     child: Center(
-                      child: Image.network(
-                        url,
+                      child: CachedNetworkImage(
+                        imageUrl: image.fullUrl,
                         fit: BoxFit.contain,
                         width: double.infinity,
                         height: double.infinity,
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return const Center(
-                            child: SizedBox(
-                              width: 32,
-                              height: 32,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 3,
-                                color: Colors.white,
+                        memCacheWidth: 1600,
+                        memCacheHeight: 1600,
+                        progressIndicatorBuilder: (context, url, progress) =>
+                            const Center(
+                              child: SizedBox(
+                                width: 32,
+                                height: 32,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 3,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.broken_image,
-                                size: 48,
-                                color: Colors.white54,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Unable to load image',
-                                style: Theme.of(dialogContext)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(color: Colors.white54),
-                              ),
-                            ],
-                          );
-                        },
+                        errorWidget: (context, url, error) => Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.broken_image,
+                              size: 48,
+                              color: Colors.white54,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Unable to load image',
+                              style: Theme.of(dialogContext)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(color: Colors.white54),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -2227,36 +2115,36 @@ class _GalleryUrlItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: GestureDetector(
           onTap: () => _openFullScreen(context),
-          child: Image.network(
-            url,
+          child: CachedNetworkImage(
+            // Grid uses the lightweight server-side WebP thumbnail.
+            imageUrl: image.thumbUrl,
             fit: BoxFit.cover,
             width: double.infinity,
-            loadingBuilder: (context, child, progress) {
-              if (progress == null) return child;
-              return const Padding(
-                padding: EdgeInsets.all(32),
-                child: _SplashLoading(),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.broken_image, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(height: 8),
-                    Text(url),
-                  ],
-                ),
-              );
-            },
+            // Decode the thumbnail at a small size to save memory & speed up rendering.
+            memCacheWidth: 400,
+            memCacheHeight: 400,
+            placeholder: (context, url) => const Padding(
+              padding: EdgeInsets.all(32),
+              child: _SplashLoading(),
+            ),
+            errorWidget: (context, url, error) => Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.broken_image, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(height: 8),
+                  Text(image.thumbUrl),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 }
+
 
 class WebsitePageScreen extends StatefulWidget {
   const WebsitePageScreen({super.key, required this.spec});
@@ -2954,7 +2842,7 @@ class _AboutScreenState extends State<AboutScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'We welcome all visitors to Gurdwara Sahib Melaka. Please feel free to visit us during our open hours.',
+                        'Gurdwara Sahib Melaka is open daily.',
                         style: theme.textTheme.bodyMedium,
                       ),
                     ],
