@@ -390,7 +390,27 @@ Gallery now loads lightweight WebP thumbnails in the grid, decodes them at a sma
 1. Verify GitHub Actions iOS build triggered successfully on the latest push
 2. Continue iOS development/testing if needed
 
+## Session 11: Remove Duplicate iOS Build Workflow (2026-08-17)
+
+### Problem
+Two GitHub Actions workflow files named "iOS Build" existed in the repo, both triggering on pushes to `main`. This caused **two identical iOS builds** to run on every push, wasting Actions minutes.
+
+### Root Cause
+- `gurdwara_app/.github/workflows/ios-build.yml` (project level) — added in initial commit (July 23), missing `working-directory` config
+- `.github/workflows/ios-build.yml` (root level) — added July 29, has correct `defaults.run.working-directory: gurdwara_app`
+
+### Completed
+- [x] Investigated git history to confirm which workflow ran in previous single-build push (project-level, the only one that existed at the time)
+- [x] Deleted the duplicate project-level workflow (`gurdwara_app/.github/workflows/ios-build.yml`)
+- [x] Committed (commit `06ab297`) and pushed to GitHub (`a9eeb7d..06ab297 main -> main`)
+- [x] Verified only one workflow remains: `.github/workflows/ios-build.yml` (root level, correct config)
+
+### Result
+- Only **one** iOS build now runs per push to `main`
+- The remaining root-level workflow has the correct `working-directory: gurdwara_app` config
+
 ## Development Starting Points
+
 
 1. **Android Development**: Use `flutter run` on Windows with Android emulator
 
