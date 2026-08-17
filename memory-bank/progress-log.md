@@ -452,7 +452,24 @@ Two iOS build actions were running at the same time for commits `002d6ed` and `c
 - Only app code changes trigger the build, saving Actions minutes
 - Note: This workflow change itself triggered a build (since the workflow file is in the paths filter) — expected and verifies the workflow still works
 
+## Session 14: Show App Version in About Page Footer (2026-08-17)
+
+### Completed
+- [x] Added `package_info_plus` import to `main.dart` (dependency already present from Session 9)
+- [x] Created `_AboutFooter` stateful widget that reads the installed app version via `PackageInfo.fromPlatform()` and displays it below the copyright line
+- [x] Replaced the plain copyright `Text` in `_buildAboutContent` with the new `_AboutFooter` widget
+- [x] Version displays as e.g. `Version 1.0.3 (4)` (version + build number from pubspec.yaml at build time)
+- [x] Graceful fallback: if package info can't be read, only the copyright line shows
+- [x] Verified `flutter analyze` — no new errors (only pre-existing warnings/infos remain)
+- [x] Committed (commit `fbd3dcf`) and pushed to GitHub (`e280d53..fbd3dcf main -> main`)
+
+### Result
+- The About page footer now shows the installed app version (e.g. `Version 1.0.3 (4)`) below the copyright line
+- Reads the actual installed build version, so it always reflects what the user has (useful for support/debugging)
+- This change modified `lib/**`, so it triggered an iOS build (expected)
+
 ## Development Starting Points
+
 
 
 
