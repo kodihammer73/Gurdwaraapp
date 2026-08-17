@@ -409,7 +409,35 @@ Two GitHub Actions workflow files named "iOS Build" existed in the repo, both tr
 - Only **one** iOS build now runs per push to `main`
 - The remaining root-level workflow has the correct `working-directory: gurdwara_app` config
 
+## Session 12: Fix iOS App Icon & Firebase Config (2026-08-17)
+
+### Problem
+The iOS app looked different from Android:
+1. iOS app icon was the **default Flutter template** (white background) instead of the saffron Gurdwara icon
+2. iOS Firebase config had critical mismatches that would break the app
+
+### Root Cause Analysis
+- **iOS icons** (`ios/Runner/Assets.xcassets/AppIcon.appiconset/`) were never customized — still default Flutter template icons (only touched in initial commit)
+- **Android icons** were updated in commit `0e0d8d1` with saffron `#E8A838` background + custom foreground
+- **`GoogleService-Info.plist`** had `BUNDLE_ID = com.gurdwara.mobileapp` (OLD) while Xcode project uses `com.gsmelaka.mobileapp` (NEW) — mismatch would break Firebase/push on iOS
+- **`firebase_options.dart`** iOS `apiKey` was the **Android** key (`AIzaSyDBpX3skwF4CruTyzhaV6XtUdbqf0egcU4`) instead of the correct iOS key (`AIzaSyD4TBX5T2fOgk4stWI5naae9PCibYkYQj4`)
+
+### Completed
+- [x] Generated saffron iOS app icons from `web/translogo.png` composited on `#E8A838` background (all 21 sizes)
+- [x] Fixed `GoogleService-Info.plist` BUNDLE_ID → `com.gsmelaka.mobileapp`
+- [x] Fixed `firebase_options.dart` iOS API key → `AIzaSyD4TBX5T2fOgk4stWI5naae9PCibYkYQj4`
+- [x] Verified `MARKETING_VERSION` — main app correctly uses Flutter version (1.0.3+4); the `1.0` in pbxproj is only for RunnerTests target (harmless)
+- [x] Verified `flutter analyze` — only pre-existing warnings, no errors from changes
+- [x] Added `tool/generate_ios_icons.py` for regenerating iOS icons
+- [x] Committed (commit `002d6ed`) and pushed to GitHub (`7fdb43e..002d6ed main -> main`)
+
+### Result
+- iOS app now shows the saffron Gurdwara icon matching Android
+- iOS Firebase config now matches the app's bundle ID and uses the correct iOS API key
+- Push notifications and Firebase init will work correctly on iOS
+
 ## Development Starting Points
+
 
 
 1. **Android Development**: Use `flutter run` on Windows with Android emulator
