@@ -513,6 +513,26 @@ Two iOS build actions were running at the same time for commits `002d6ed` and `c
 - Onboarding screen for first-time users
 - Language selection (English/Malay/Punjabi)
 
+## Session 17: Calendar List Filter, Theme Auto-Switch & About Section Fixes (2026-08-21)
+
+### Completed
+- [x] **Calendar List View Filter**: When switching to the event list view, only events from today onwards are shown (past records hidden)
+- [x] **Settings Dark Mode Auto-Switch**: Selecting Dark/Light/System in Settings now switches the app theme immediately (via `onThemeModeChanged` callback wired from `_GurdwaraAppState` → `HomeScreen` → `SettingsScreen`)
+- [x] **Settings About Section**: Replaced temple icon with the Gurdwara logo (`web/logo.png`), and wording now reads "Developed for Gurdwara Sahib Melaka vX.X.X" (version read from pubspec via `package_info_plus`)
+- [x] `flutter analyze` — no new errors (only pre-existing warnings/infos remain)
+- [x] Committed (commit `55dcc93`) and pushed to GitHub (`2811971..55dcc93 main -> main`)
+
+### Key Changes
+1. **`lib/main.dart`** (modified): Added `_filterUpcomingEvents()` helper used by the calendar list view to show only today-and-future events; added `_applyThemeMode()` and passed `onThemeModeChanged` down to `SettingsScreen` so theme changes apply instantly
+2. **`lib/widgets/settings_screen.dart`** (modified): Added `onThemeModeChanged` callback; About section now shows the Gurdwara logo and "Developed for Gurdwara Sahib Melaka vX.X.X" using `package_info_plus`
+
+### Next Steps
+- When ready, re-add the Booking card and implement the booking screen
+- Push notification deep linking (open relevant screen on notification tap)
+- Gallery enhancements (masonry layout, swipe between full-screen images, share button)
+- Onboarding screen for first-time users
+- Language selection (English/Malay/Punjabi)
+
 ## Development Starting Points
 
 
