@@ -359,11 +359,37 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
   late Future<List<HomepageEvent>> _future;
   DateTime? _lastUpdated;
 
+  /// The Gurdwara contact number from contact_data.json (footerContact.phone),
+  /// used by the Call/WhatsApp quick actions. Falls back to empty string.
+  String _contactNumber = '';
+
   @override
   void initState() {
     super.initState();
     _future = _fetchUpcomingEvents();
+    _loadContactNumber();
   }
+
+  /// Fetches the contact number from the website's contact_data.json
+  /// (footerContact.phone) for the Call/WhatsApp quick actions.
+  Future<void> _loadContactNumber() async {
+    String number = '';
+    try {
+      final response = await _dio.get<String>('$_siteBaseUrl/contact_data.json');
+      final raw = response.data ?? '';
+      if (raw.isNotEmpty) {
+        final json = jsonDecode(raw);
+        final footerContact = json['footerContact'] as Map<String, dynamic>?;
+        number = (footerContact?['phone'] as String? ?? '').trim();
+      }
+    } catch (_) {
+      // Leave the number empty on failure; the quick actions will be hidden.
+    }
+    if (mounted && number.isNotEmpty) {
+      setState(() => _contactNumber = number);
+    }
+  }
+
 
   Future<void> _refresh() async {
     setState(() {
@@ -462,11 +488,15 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                   fit: StackFit.expand,
                   children: [
                     // Gurdwara building image (falls back to gradient on error)
+                    // The ?v=2 cache-buster forces CachedNetworkImage to treat this
+                    // as a fresh URL, clearing any previously cached load error.
                     CachedNetworkImage(
-                      imageUrl: '$_siteBaseUrl/images/gurdwara/gurdwarafront.jpeg',
+                      imageUrl:
+                          '$_siteBaseUrl/images/gurdwara/gurdwarafront.jpeg?v=2',
                       fit: BoxFit.cover,
                       memCacheWidth: 1200,
                       memCacheHeight: 800,
+
                       placeholder: (context, url) => const DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
@@ -574,9 +604,11 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               ),
             ),
             const SizedBox(height: 12),
-            // Quick actions: Call, Directions, WhatsApp
-            _QuickActionsRow(),
+            // Quick actions: Call, WhatsApp (hidden until the contact number loads)
+            if (_contactNumber.isNotEmpty)
+              _QuickActionsRow(phoneNumber: _contactNumber),
             const SizedBox(height: 12),
+
             // "Last updated" hint (shown after a pull-to-refresh)
             if (_lastUpdated != null)
               Padding(
@@ -591,11 +623,12 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                     const SizedBox(width: 6),
                     Text(
                       '${LocalizationService.instance.t('last_updated')} '
-                      '${DateFormat('h:mm a').format(_lastUpdated!)}',
+                      '${DateFormat('h:mm a').format(_lastUpdated!.toLocal())}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                     ),
+
                   ],
                 ),
               ),
@@ -690,15 +723,17 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
   TextTheme themeText(BuildContext context) => Theme.of(context).textTheme;
 }
 
-/// A row of quick-action chips (Call, Directions, WhatsApp) shown under the
-/// hero banner on the Home screen. Uses url_launcher to open the relevant app.
+/// A row of quick-action chips (Call, WhatsApp) shown under the hero banner on
+/// the Home screen. Uses url_launcher to open the relevant app. The contact
+/// number comes from the website's contact_data.json (footerContact.phone).
 class _QuickActionsRow extends StatelessWidget {
-  const _QuickActionsRow();
+  const _QuickActionsRow({required this.phoneNumber});
 
-  static const String _phoneNumber = '+6062811809';
-  static const String _whatsAppNumber = '60162811809';
-  static const String _mapsQuery =
-      'Gurdwara Sahib Melaka, Jalan Tengkera, Melaka';
+  /// The Gurdwara contact number (e.g. "+6016-666 5513") from contact_data.json.
+  final String phoneNumber;
+
+  /// Strips everything except digits, for use in wa.me links.
+  String get _digitsOnly => phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
 
   Future<void> _launch(String url) async {
     final uri = Uri.parse(url);
@@ -714,24 +749,13 @@ class _QuickActionsRow extends StatelessWidget {
         icon: Icons.call_rounded,
         label: LocalizationService.instance.t('call'),
         color: const Color(0xFF43E97B),
-        onTap: () => _launch('tel:$_phoneNumber'),
-      ),
-
-      _QuickAction(
-        icon: Icons.directions_rounded,
-        label: LocalizationService.instance.t('directions'),
-        color: const Color(0xFF667EEA),
-        onTap: () => _launch(
-          'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(_mapsQuery)}',
-        ),
+        onTap: () => _launch('tel:$phoneNumber'),
       ),
       _QuickAction(
         icon: Icons.chat_rounded,
         label: LocalizationService.instance.t('whatsapp'),
         color: const Color(0xFF25D366),
-        onTap: () => _launch(
-          'https://wa.me/$_whatsAppNumber',
-        ),
+        onTap: () => _launch('https://wa.me/$_digitsOnly'),
       ),
     ];
 
@@ -745,6 +769,7 @@ class _QuickActionsRow extends StatelessWidget {
     );
   }
 }
+
 
 class _QuickAction extends StatelessWidget {
   const _QuickAction({
@@ -1346,6 +1371,8 @@ class _SplashLoadingState extends State<_SplashLoading>
     );
   }
 }
+
+
 
 class _HomepageEventTile extends StatelessWidget {
   const _HomepageEventTile({required this.event});
@@ -2749,10 +2776,15 @@ class _GalleryUrlItem extends StatelessWidget {
             // Decode the thumbnail at a small size to save memory & speed up rendering.
             memCacheWidth: 400,
             memCacheHeight: 400,
-            placeholder: (context, url) => const Padding(
-              padding: EdgeInsets.all(32),
-              child: _SplashLoading(),
+            placeholder: (context, url) => const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
             ),
+
+
             errorWidget: (context, url, error) => Padding(
               padding: const EdgeInsets.all(16),
               child: Column(

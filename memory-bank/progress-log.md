@@ -568,12 +568,52 @@ Two iOS build actions were running at the same time for commits `002d6ed` and `c
 2. **`lib/main.dart`** (modified): Registered the deep-link callback in `_HomeScreenState`; added `_lastUpdated` state + hint on Home; added `_QuickActionsRow`/`_QuickAction` widgets; cached About contact data; wired `maybeShowWhatsNew`; cleaned up analyzer warnings
 3. **`lib/widgets/settings_screen.dart`** (modified): Added Language section with `AppLanguage` radio list; listens to `LocalizationService.instance.language` to rebuild on change
 
+### Follow-up Fix: Home Hero Banner Image Not Showing (2026-08-21)
+- [x] Investigated why the home screen hero banner wasn't showing `images/gurdwara/gurdwarafront.jpeg`
+- [x] **Verified the image & URL are fine**: `https://www.gurdwarasahibmelaka.com/images/gurdwara/gurdwarafront.jpeg` returns HTTP 200 with `Content-Type: image/jpeg` (115,504 bytes); downloaded and confirmed valid JPEG magic bytes (`ffd8ffe0` + `JFIF`); file also exists locally at `website/images/gurdwara/gurdwarafront.jpeg`
+- [x] **Root cause**: `CachedNetworkImage` caches load failures too. If the image failed to load once (e.g. during earlier flaky-network testing), the app kept showing the saffron gradient `errorWidget` instead of retrying
+- [x] **Fix**: Added a cache-busting query param `?v=2` to the hero image URL so `CachedNetworkImage` treats it as a fresh URL and re-fetches, clearing any previously cached load error
+- [x] `flutter analyze` — no new errors (only pre-existing `avoid_print` info-level suggestions remain)
+- [x] **Note**: Requires a hot restart (not just hot reload) on the device to clear the in-memory image cache
+
 ### Next Steps
 - When ready, re-add the Booking card and implement the booking screen
 - Gallery enhancements (masonry layout, share button)
 - Apply localization strings more broadly across all screens
 
+
+## Session 20: Time Zone Fix, Remove Language Toggle & Dynamic Quick Actions (2026-08-21)
+
+### Completed
+- [x] **"Last Updated" Hint Time Zone Fix**: The Home screen's "Updated h:mm" hint now calls `.toLocal()` on the timestamp before formatting, guaranteeing it always renders in the user's device time zone regardless of how the DateTime was created
+- [x] **Removed Language Toggle**: Removed the entire Language section (English/Malay/Punjabi radio list) from the Settings screen, along with the `_onLanguageChanged` listener registration/disposal and the now-unused `localization_service.dart` import
+- [x] **Quick Actions Use contact_data.json Number**: The Call and WhatsApp chips now use the contact number from the website's `contact_data.json` → `footerContact.phone` (`+6016-666 5513`) instead of the hardcoded `+6062811809` / `60162811809`
+- [x] **Removed Directions Chip**: Removed the Directions (Google Maps) quick-action chip and its `_mapsQuery` constant; the row now shows only Call + WhatsApp
+- [x] `flutter analyze` — no new errors (only pre-existing `avoid_print` info-level suggestions remain)
+
+### Key Changes
+1. **`lib/main.dart`** (modified): `_QuickActionsRow` now takes a required `phoneNumber` parameter and strips non-digits for the `wa.me` link; added `_contactNumber` state + `_loadContactNumber()` in `_HomeScreenContentState` that fetches `contact_data.json` and passes the number to the row (row hidden until the number loads); removed the Directions chip and `_mapsQuery`; added `.toLocal()` to the "last updated" hint
+2. **`lib/widgets/settings_screen.dart`** (modified): Removed the Language section UI, the `LocalizationService.instance.language` listener, the `_onLanguageChanged` method, and the unused `localization_service.dart` import
+
+### Note
+- No git commit/push was performed because the `d:\GSM` workspace is not currently a git repository (no `.git` directory found). The previous repo was at `https://github.com/kodihammer73/Gurdwaraapp.git`.
+
+### Follow-up Fix: Gallery RenderFlex Overflow Crash (2026-08-21)
+- [x] Fixed a `RenderFlex overflowed by 83 pixels` crash that occurred when opening the Gallery tab
+- [x] **Root cause**: `_SplashLoading` was a fixed 128×128 widget (88px ring + 16px gap + 24px spinner). When used as the `placeholder` for `CachedNetworkImage` in the gallery grid tiles, it was squeezed into a small box (e.g. 128×44.8 after padding), causing the vertical Column to overflow
+- [x] **First attempt (reverted)**: Made `_SplashLoading` constraint-aware using `LayoutBuilder` — but this broke the full-screen loading states because `_SplashLoading` is also used inside `SliverFillRemaining` (Home/Calendar/Gallery/About), which computes intrinsic dimensions and threw `LayoutBuilder does not support returning intrinsic dimensions`
+- [x] **Final fix**: Reverted `_SplashLoading` to its original fixed-size form (no `LayoutBuilder`), and changed the gallery image `placeholder` to use a simple centered 24×24 `CircularProgressIndicator` instead of `_SplashLoading`. This avoids the overflow in small grid tiles without affecting the full-screen loading states
+- [x] `flutter analyze` — no new errors (only pre-existing `avoid_print` info-level suggestions remain)
+
+
+### Next Steps
+- When ready, re-add the Booking card and implement the booking screen
+- Gallery enhancements (masonry layout, share button)
+- Apply localization strings more broadly across all screens
+
+
 ## Development Starting Points
+
 
 
 

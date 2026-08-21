@@ -7,9 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../services/localization_service.dart';
-
 class SettingsScreen extends StatefulWidget {
+
   const SettingsScreen({super.key, this.onThemeModeChanged});
 
   /// Called when the user changes the theme mode, so the app can
@@ -30,21 +29,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _loadPreferences();
     _loadVersion();
-    // Rebuild the settings screen when the language changes.
-    LocalizationService.instance.language.addListener(_onLanguageChanged);
-  }
-
-  @override
-  void dispose() {
-    LocalizationService.instance.language.removeListener(_onLanguageChanged);
-    super.dispose();
-  }
-
-  void _onLanguageChanged() {
-    if (mounted) setState(() {});
   }
 
   Future<void> _loadPreferences() async {
+
     try {
       final prefs = await SharedPreferences.getInstance();
       setState(() {
@@ -193,42 +181,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Language section
-                  Text(
-                    'Language',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Card(
-                    margin: EdgeInsets.zero,
-                    child: Column(
-                      children: [
-                        for (final lang in AppLanguage.values)
-                          ListTile(
-                            leading: const Icon(Icons.language_rounded),
-                            title: Text(lang.label),
-                            trailing: Icon(
-                              LocalizationService.instance.language.value == lang
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_off,
-                              color: LocalizationService.instance.language.value ==
-                                      lang
-                                  ? theme.colorScheme.primary
-                                  : null,
-                            ),
-                            onTap: () =>
-                                LocalizationService.instance.setLanguage(lang),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
                   // About section
+
                   Text(
                     'About',
                     style: theme.textTheme.titleMedium?.copyWith(
