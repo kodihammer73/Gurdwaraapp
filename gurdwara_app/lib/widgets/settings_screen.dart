@@ -4,10 +4,15 @@
 // and theme mode selection. Uses SharedPreferences for persistence.
 
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.onThemeModeChanged});
+
+  /// Called when the user changes the theme mode, so the app can
+  /// rebuild immediately with the new theme.
+  final ValueChanged<String>? onThemeModeChanged;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -16,11 +21,13 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationsEnabled = true;
   String _themeMode = 'system'; // 'system' | 'light' | 'dark'
+  String? _versionText;
 
   @override
   void initState() {
     super.initState();
     _loadPreferences();
+    _loadVersion();
   }
 
   Future<void> _loadPreferences() async {
@@ -32,6 +39,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
     } catch (_) {
       // Keep defaults.
+    }
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final version = info.version.trim();
+      final build = info.buildNumber.trim();
+      setState(() {
+        _versionText = build.isEmpty ? version : '$version ($build)';
+      });
+    } catch (_) {
+      _versionText = null;
     }
   }
 
@@ -53,6 +73,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       // Best effort.
     }
+    // Notify the app to rebuild with the new theme immediately.
+    widget.onThemeModeChanged?.call(mode);
   }
 
   @override
@@ -168,9 +190,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Card(
                     margin: EdgeInsets.zero,
                     child: ListTile(
-                      leading: const Icon(Icons.temple_buddhist),
+                      leading: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8A838).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.all(6),
+                        child: Image.asset(
+                          'web/logo.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Icon(
+                              Icons.temple_buddhist,
+                              color: theme.colorScheme.primary,
+                            );
+                          },
+                        ),
+                      ),
                       title: const Text('Gurdwara Sahib Melaka'),
-                      subtitle: const Text('1925'),
+                      subtitle: Text(
+                        _versionText != null
+                            ? 'Developed for Gurdwara Sahib Melaka v$_versionText'
+                            : 'Developed for Gurdwara Sahib Melaka',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),

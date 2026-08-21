@@ -93,16 +93,21 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final mode = prefs.getString('theme_mode') ?? 'system';
-      final themeMode = switch (mode) {
-        'light' => ThemeMode.light,
-        'dark' => ThemeMode.dark,
-        _ => ThemeMode.system,
-      };
-      if (mounted) {
-        setState(() => _themeMode = themeMode);
-      }
+      _applyThemeMode(mode);
     } catch (_) {
       // Keep system default.
+    }
+  }
+
+  /// Applies the given theme mode string ('system' | 'light' | 'dark').
+  void _applyThemeMode(String mode) {
+    final themeMode = switch (mode) {
+      'light' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    };
+    if (mounted) {
+      setState(() => _themeMode = themeMode);
     }
   }
 
@@ -143,7 +148,9 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
         switchOutCurve: Curves.easeIn,
         child: _showSplash
             ? const BrandedSplashScreen()
-            : const HomeScreen(),
+            : HomeScreen(
+                onThemeModeChanged: _applyThemeMode,
+              ),
       ),
     );
   }
@@ -152,7 +159,10 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
 
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.onThemeModeChanged});
+
+  /// Called when the user changes the theme mode in Settings.
+  final ValueChanged<String>? onThemeModeChanged;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -183,7 +193,9 @@ class _HomeScreenState extends State<HomeScreen> {
       case 3:
         return const AboutScreen();
       case 4:
-        return const SettingsScreen();
+        return SettingsScreen(
+          onThemeModeChanged: widget.onThemeModeChanged,
+        );
       default:
         return HomeScreenContent(
           onCalendarSelected: () => _selectTab(1),
@@ -1312,6 +1324,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
     });
   }
 
+  /// Returns only events from today onwards (for the list view).
+  List<HomepageEvent> _filterUpcomingEvents(List<HomepageEvent> events) {
+    final today = dateOnly(DateTime.now());
+    return events.where((event) {
+      return !dateOnly(event.date).isBefore(today);
+    }).toList();
+  }
+
   void _showDateDetails(
     BuildContext context,
     DateTime date,
@@ -1504,7 +1524,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        if (events.isEmpty)
+                        if (_filterUpcomingEvents(events).isEmpty)
                           Padding(
                             padding: const EdgeInsets.all(32),
                             child: Column(
@@ -1518,7 +1538,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 ),
                                 const SizedBox(height: 12),
                                 Text(
-                                  'No events available.',
+                                  'No upcoming events.',
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodyMedium,
@@ -1528,7 +1548,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             ),
                           )
                         else
-                          ...events.map(
+                          ..._filterUpcomingEvents(events).map(
                             (event) => Padding(
                               padding: const EdgeInsets.only(bottom: 8),
                               child: Card(
