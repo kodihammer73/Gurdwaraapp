@@ -20,6 +20,7 @@ import 'services/version_check_service.dart';
 import 'widgets/branded_splash_screen.dart';
 import 'widgets/force_update_dialog.dart';
 import 'widgets/immersive_category_grid.dart';
+import 'widgets/onboarding_screen.dart';
 import 'widgets/settings_screen.dart';
 
 
@@ -79,6 +80,7 @@ class GurdwaraApp extends ConsumerStatefulWidget {
 class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
   final VersionCheckService _versionCheckService = VersionCheckService();
   bool _showSplash = true;
+  bool _showOnboarding = false;
   ThemeMode _themeMode = ThemeMode.system;
 
   @override
@@ -86,6 +88,34 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
     super.initState();
     _bootSequence();
     _loadThemeMode();
+    _checkOnboarding();
+  }
+
+  /// Checks whether the user has seen the onboarding screen before.
+  /// If not, shows it after the splash.
+  Future<void> _checkOnboarding() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seen = prefs.getBool('onboarding_seen') ?? false;
+      if (!seen && mounted) {
+        setState(() => _showOnboarding = true);
+      }
+    } catch (_) {
+      // If we can't read the flag, default to not showing onboarding.
+    }
+  }
+
+  /// Marks onboarding as seen and transitions to the main app.
+  Future<void> _finishOnboarding() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('onboarding_seen', true);
+    } catch (_) {
+      // Ignore persistence errors.
+    }
+    if (mounted) {
+      setState(() => _showOnboarding = false);
+    }
   }
 
   /// Loads the user's theme preference from SharedPreferences.
@@ -148,9 +178,11 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
         switchOutCurve: Curves.easeIn,
         child: _showSplash
             ? const BrandedSplashScreen()
-            : HomeScreen(
-                onThemeModeChanged: _applyThemeMode,
-              ),
+            : _showOnboarding
+                ? OnboardingScreen(onFinished: _finishOnboarding)
+                : HomeScreen(
+                    onThemeModeChanged: _applyThemeMode,
+                  ),
       ),
     );
   }
@@ -375,68 +407,121 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Welcome card with immersive gradient style (brand colors)
+            // Hero banner with the Gurdwara building image + gradient overlay
             SizedBox(
               width: double.infinity,
-              child: _ImmersiveInfoCard(
-                gradientColors: const [
-                  Color(0xFFE8A838), // Saffron
-                  Color(0xFFC5851E), // Saffron Dark
-                ],
-                child: Column(
+              height: 200,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Text(
-                      'Waheguru Ji Ka Khalsa Waheguru Ji Ki Fateh',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.2,
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    // Today's date badge (replaces "WELCOME : Guest")
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.25),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.calendar_today_rounded,
-                                color: Colors.white,
-                                size: 13,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                DateFormat('EEEE, d MMMM yyyy').format(DateTime.now()),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.95),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.4,
-                                ),
-                              ),
+                    // Gurdwara building image (falls back to gradient on error)
+                    CachedNetworkImage(
+                      imageUrl: '$_siteBaseUrl/images/gurdwara/gurdwarafront.jpeg',
+                      fit: BoxFit.cover,
+                      memCacheWidth: 1200,
+                      memCacheHeight: 800,
+                      placeholder: (context, url) => const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFFE8A838),
+                              Color(0xFFC5851E),
                             ],
                           ),
                         ),
+                      ),
+                      errorWidget: (context, url, error) => const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFFE8A838),
+                              Color(0xFFC5851E),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Saffron→navy gradient overlay for text legibility
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Color(0xCC1B365D),
+                          ],
+                          stops: [0.35, 1.0],
+                        ),
+                      ),
+                    ),
+                    // Foreground content
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            'Waheguru Ji Ka Khalsa Waheguru Ji Ki Fateh',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.2,
+                              height: 1.3,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Today's date badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.3),
+                                width: 0.5,
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.calendar_today_rounded,
+                                      color: Colors.white,
+                                      size: 13,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      DateFormat('EEEE, d MMMM yyyy')
+                                          .format(DateTime.now()),
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.95),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.4,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -987,8 +1072,33 @@ class _UpcomingEventsCardState extends State<UpcomingEventsCard> {
   }
 }
 
-class _SplashLoading extends StatelessWidget {
+class _SplashLoading extends StatefulWidget {
   const _SplashLoading();
+
+  @override
+  State<_SplashLoading> createState() => _SplashLoadingState();
+}
+
+class _SplashLoadingState extends State<_SplashLoading>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _pulse = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1000,26 +1110,62 @@ class _SplashLoading extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(
-              child: Image.asset(
-                _siteLogoAsset,
-                width: 64,
-                height: 64,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(
-                    Icons.temple_buddhist,
-                    size: 40,
-                    color: Theme.of(context).colorScheme.primary,
-                  );
-                },
-              ),
+            // Branded gradient ring around the logo with a gentle pulse
+            AnimatedBuilder(
+              animation: _pulse,
+              builder: (context, child) {
+                return Container(
+                  width: 88,
+                  height: 88,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFFE8A838), // Saffron
+                        Color(0xFF1B365D), // Navy
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE8A838)
+                            .withValues(alpha: 0.25 + 0.25 * _pulse.value),
+                        blurRadius: 18 + 10 * _pulse.value,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Theme.of(context).colorScheme.surface,
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: Image.asset(
+                      _siteLogoAsset,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Icon(
+                          Icons.temple_buddhist,
+                          size: 40,
+                          color: Theme.of(context).colorScheme.primary,
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             SizedBox(
               width: 24,
               height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ],
         ),
@@ -2245,7 +2391,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final images = _filteredImages(data);
-                        return _GalleryUrlItem(image: images[index]);
+                        return _GalleryUrlItem(
+                          image: images[index],
+                          images: images,
+                          initialIndex: index,
+                        );
                       },
                       childCount: _filteredImages(data).length,
                     ),
@@ -2306,9 +2456,20 @@ String _capitalize(String input) {
 }
 
 class _GalleryUrlItem extends StatelessWidget {
-  const _GalleryUrlItem({required this.image});
+  const _GalleryUrlItem({
+    required this.image,
+    this.images = const [],
+    this.initialIndex = 0,
+  });
 
   final _GalleryImage image;
+
+  /// The full list of images in the current filtered set, used to enable
+  /// swipe-between-photos in the full-screen viewer.
+  final List<_GalleryImage> images;
+
+  /// The index of [image] within [images], used as the starting page.
+  final int initialIndex;
 
   void _openFullScreen(BuildContext context) {
     showGeneralDialog<void>(
@@ -2318,61 +2479,31 @@ class _GalleryUrlItem extends StatelessWidget {
       barrierColor: Colors.black,
       transitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        // If we have a full set, use a swipeable PageView; otherwise fall back
+        // to a single image.
+        final hasSet = images.length > 1;
         return Material(
           color: Colors.transparent,
           child: Stack(
             children: [
-              // Full-screen image with InteractiveViewer for pinch-to-zoom.
-              // Uses the full-resolution URL here (only fetched on tap).
+              // Full-screen viewer: PageView for swipe-between-photos, each
+              // page wrapped in InteractiveViewer for pinch-to-zoom.
               Positioned.fill(
-                child: GestureDetector(
-                  onTap: () => Navigator.of(dialogContext).pop(),
-                  child: InteractiveViewer(
-                    minScale: 0.5,
-                    maxScale: 4.0,
-                    panEnabled: true,
-                    boundaryMargin: const EdgeInsets.all(80),
-                    child: Center(
-                      child: CachedNetworkImage(
-                        imageUrl: image.fullUrl,
-                        fit: BoxFit.contain,
-                        width: double.infinity,
-                        height: double.infinity,
-                        memCacheWidth: 1600,
-                        memCacheHeight: 1600,
-                        progressIndicatorBuilder: (context, url, progress) =>
-                            const Center(
-                              child: SizedBox(
-                                width: 32,
-                                height: 32,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 3,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                        errorWidget: (context, url, error) => Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.broken_image,
-                              size: 48,
-                              color: Colors.white54,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Unable to load image',
-                              style: Theme.of(dialogContext)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(color: Colors.white54),
-                            ),
-                          ],
-                        ),
+                child: hasSet
+                    ? PageView.builder(
+                        controller: PageController(initialPage: initialIndex),
+                        itemCount: images.length,
+                        itemBuilder: (context, index) {
+                          return _FullScreenImage(
+                            image: images[index],
+                            onTap: () => Navigator.of(dialogContext).pop(),
+                          );
+                        },
+                      )
+                    : _FullScreenImage(
+                        image: image,
+                        onTap: () => Navigator.of(dialogContext).pop(),
                       ),
-                    ),
-                  ),
-                ),
               ),
               // Close button at top-right
               Positioned(
@@ -2388,6 +2519,35 @@ class _GalleryUrlItem extends StatelessWidget {
                   ),
                 ),
               ),
+              // Counter indicator (e.g. "3 / 24") when swiping through a set
+              if (hasSet)
+                Positioned(
+                  bottom: MediaQuery.of(dialogContext).padding.bottom + 16,
+                  left: 0,
+                  right: 0,
+                  child: SafeArea(
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${initialIndex + 1} / ${images.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         );
@@ -2429,6 +2589,66 @@ class _GalleryUrlItem extends StatelessWidget {
                   Text(image.thumbUrl),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A single full-screen image with pinch-to-zoom, used inside the swipeable
+/// PageView. Tapping closes the viewer.
+class _FullScreenImage extends StatelessWidget {
+  const _FullScreenImage({required this.image, required this.onTap});
+
+  final _GalleryImage image;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: InteractiveViewer(
+        minScale: 0.5,
+        maxScale: 4.0,
+        panEnabled: true,
+        boundaryMargin: const EdgeInsets.all(80),
+        child: Center(
+          child: CachedNetworkImage(
+            imageUrl: image.fullUrl,
+            fit: BoxFit.contain,
+            width: double.infinity,
+            height: double.infinity,
+            memCacheWidth: 1600,
+            memCacheHeight: 1600,
+            progressIndicatorBuilder: (context, url, progress) => const Center(
+              child: SizedBox(
+                width: 32,
+                height: 32,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            errorWidget: (context, url, error) => Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.broken_image,
+                  size: 48,
+                  color: Colors.white54,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Unable to load image',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: Colors.white54),
+                ),
+              ],
             ),
           ),
         ),
@@ -2633,37 +2853,80 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Card(
           margin: EdgeInsets.zero,
+          elevation: 0,
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: theme.colorScheme.outlineVariant),
+          ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.cloud_off_outlined,
-                  size: 40,
-                  color: Theme.of(context).colorScheme.primary,
+                // Saffron-tinted icon badge
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8A838).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.cloud_off_outlined,
+                    size: 36,
+                    color: Color(0xFFE8A838),
+                  ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   message,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+                // Gradient Retry button
                 FilledButton(
                   onPressed: () => onRetry(),
-                  child: const Text('Retry'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE8A838),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 28,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.refresh_rounded, size: 18),
+                      SizedBox(width: 8),
+                      Text('Retry'),
+                    ],
+                  ),
                 ),
               ],
             ),

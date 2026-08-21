@@ -529,8 +529,26 @@ Two iOS build actions were running at the same time for commits `002d6ed` and `c
 ### Next Steps
 - When ready, re-add the Booking card and implement the booking screen
 - Push notification deep linking (open relevant screen on notification tap)
-- Gallery enhancements (masonry layout, swipe between full-screen images, share button)
-- Onboarding screen for first-time users
+- Gallery enhancements (masonry layout, share button)
+- Language selection (English/Malay/Punjabi)
+
+## Session 18: Hero Banner, Gallery Swipe, Onboarding & Branded States (2026-08-21)
+
+### Completed
+- [x] **Home Hero Banner**: Replaced the gradient welcome card with a hero banner featuring the Gurdwara building image (`images/gurdwara/gurdwarafront.jpeg`) with a saffron→navy gradient overlay, kept the today's-date badge, and added a graceful gradient fallback if the image fails to load
+- [x] **Gallery Swipe Between Photos**: Upgraded the full-screen viewer from a single image to a swipeable `PageView` (each page keeps pinch-to-zoom), with a "N / M" counter indicator; the grid stays a uniform 2-column layout
+- [x] **Onboarding Screen** (new `lib/widgets/onboarding_screen.dart`): 3-page swipeable onboarding (Welcome / Events & Calendar / Stay Connected) with brand gradient, glassmorphism icons, `smooth_page_indicator`, Skip + Next/Get Started; shown only on first launch via a `SharedPreferences` flag (`onboarding_seen`)
+- [x] **Branded Loading & Error States**: `_SplashLoading` now shows a pulsing saffron→navy gradient ring around the logo; `_ErrorState` got a saffron-tinted icon badge and a gradient Retry button
+- [x] `flutter analyze` — no new errors (only pre-existing warnings/infos remain)
+
+### Key Changes
+1. **`lib/main.dart`** (modified): Hero banner in `_buildHomeContent`; `_GalleryUrlItem` now accepts the full image set + starting index and opens a swipeable `PageView` via new `_FullScreenImage` widget; `_SplashLoading` converted to a stateful pulsing gradient ring; `_ErrorState` restyled with saffron badge + gradient Retry; onboarding wiring (`_checkOnboarding`, `_finishOnboarding`, `_showOnboarding`) in `_GurdwaraAppState`
+2. **`lib/widgets/onboarding_screen.dart`** (new): First-launch onboarding with 3 swipeable pages, brand gradient background, glassmorphism icon cards, page indicator, and Skip/Next/Get Started buttons
+
+### Next Steps
+- When ready, re-add the Booking card and implement the booking screen
+- Push notification deep linking (open relevant screen on notification tap)
+- Gallery enhancements (masonry layout, share button)
 - Language selection (English/Malay/Punjabi)
 
 ## Development Starting Points
