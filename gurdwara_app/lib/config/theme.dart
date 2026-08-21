@@ -1,74 +1,77 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-const Color _blue = Color(0xFF1E5AA8);
-const Color _blueLight = Color(0xFF6EA3F1);
-const Color _green = Color(0xFF2E8B57);
-const Color _greenLight = Color(0xFF7BCB8A);
-const Color _red = Color(0xFFC94B4B);
-const Color _cream = Color(0xFFFBF8F1);
+// Brand colors from design guidelines
+const Color _saffron = Color(0xFFE8A838);
+const Color _saffronLight = Color(0xFFF5D084);
+const Color _saffronDark = Color(0xFFC5851E);
+const Color _navy = Color(0xFF1B365D);
+const Color _navyLight = Color(0xFF2A4B7C);
+const Color _gold = Color(0xFFC5A028);
+const Color _goldLight = Color(0xFFE0C060);
+const Color _cream = Color(0xFFFAF8F5);
 const Color _creamAlt = Color(0xFFF0E7D6);
-const Color _charcoal = Color(0xFF1D1A17);
+const Color _charcoal = Color(0xFF1A1817);
 const Color _charcoalLight = Color(0xFF2C2824);
-const Color _stone = Color(0xFFD4C8B8);
+const Color _stone = Color(0xFFE2DFD8);
 const Color _white = Color(0xFFFFFFFF);
 
 class AppTheme {
   static ThemeData lightTheme = _buildTheme(
     brightness: Brightness.light,
     scheme: ColorScheme.light(
-      primary: _blue,
-      onPrimary: _white,
-      primaryContainer: const Color(0xFFD9E7FB),
-      onPrimaryContainer: _blue,
-      secondary: _green,
+      primary: _saffron,
+      onPrimary: _navy,
+      primaryContainer: const Color(0xFFFBE7C4),
+      onPrimaryContainer: _saffronDark,
+      secondary: _navy,
       onSecondary: _white,
-      secondaryContainer: const Color(0xFFD8F0DF),
-      onSecondaryContainer: _green,
-      tertiary: _red,
-      onTertiary: _white,
-      tertiaryContainer: const Color(0xFFF7DADA),
-      onTertiaryContainer: _red,
+      secondaryContainer: const Color(0xFFD9E7FB),
+      onSecondaryContainer: _navy,
+      tertiary: _gold,
+      onTertiary: _navy,
+      tertiaryContainer: const Color(0xFFF3E6C4),
+      onTertiaryContainer: _gold,
       error: const Color(0xFFC62828),
       onError: _white,
       errorContainer: const Color(0xFFFFDAD6),
       onErrorContainer: const Color(0xFF410E0B),
       surface: _white,
-      onSurface: _charcoal,
+      onSurface: _navy,
       surfaceContainerHighest: _creamAlt,
       outline: _stone,
       outlineVariant: const Color(0xFFB9AA95),
       shadow: Colors.black,
       scrim: Colors.black,
-      inverseSurface: _charcoal,
+      inverseSurface: _navy,
       onInverseSurface: _cream,
-      inversePrimary: _blueLight,
+      inversePrimary: _saffronLight,
     ),
     scaffoldBackgroundColor: _cream,
     appBarBackgroundColor: _cream,
     cardColor: _white,
     cardBorderColor: _stone,
-    navSelectedColor: _blue,
+    navSelectedColor: _navy,
     navUnselectedColor: const Color(0xFF66707A),
     navBackgroundColor: _white,
-    navIndicatorColor: const Color(0xFFD9E7FB),
+    navIndicatorColor: const Color(0xFFF5D084),
   );
 
   static ThemeData darkTheme = _buildTheme(
     brightness: Brightness.dark,
     scheme: ColorScheme.dark(
-      primary: _blueLight,
-      onPrimary: _charcoal,
-      primaryContainer: const Color(0xFF183D6E),
-      onPrimaryContainer: const Color(0xFFD9E7FB),
-      secondary: _greenLight,
-      onSecondary: _charcoal,
-      secondaryContainer: const Color(0xFF214F37),
-      onSecondaryContainer: const Color(0xFFD8F0DF),
-      tertiary: const Color(0xFFF08C8C),
-      onTertiary: _charcoal,
-      tertiaryContainer: const Color(0xFF6A2525),
-      onTertiaryContainer: const Color(0xFFF7DADA),
+      primary: _saffronLight,
+      onPrimary: _navy,
+      primaryContainer: const Color(0xFF5A3E12),
+      onPrimaryContainer: const Color(0xFFF5D084),
+      secondary: _navyLight,
+      onSecondary: _white,
+      secondaryContainer: const Color(0xFF183D6E),
+      onSecondaryContainer: const Color(0xFFD9E7FB),
+      tertiary: _goldLight,
+      onTertiary: _navy,
+      tertiaryContainer: const Color(0xFF4A3A10),
+      onTertiaryContainer: const Color(0xFFF3E6C4),
       error: const Color(0xFFFFB4AB),
       onError: const Color(0xFF690005),
       errorContainer: const Color(0xFF93000A),
@@ -76,22 +79,23 @@ class AppTheme {
       surface: _charcoal,
       onSurface: _cream,
       surfaceContainerHighest: _charcoalLight,
+      onSurfaceVariant: const Color(0xFFC8BFB2),
       outline: const Color(0xFF7A6F62),
       outlineVariant: const Color(0xFF5D5449),
       shadow: Colors.black,
       scrim: Colors.black,
       inverseSurface: _cream,
       onInverseSurface: _charcoal,
-      inversePrimary: _blue,
+      inversePrimary: _saffron,
     ),
     scaffoldBackgroundColor: _charcoal,
     appBarBackgroundColor: _charcoalLight,
     cardColor: _charcoalLight,
     cardBorderColor: const Color(0xFF665A4C),
-    navSelectedColor: _blueLight,
+    navSelectedColor: _saffronLight,
     navUnselectedColor: const Color(0xFFC8BFB2),
     navBackgroundColor: _charcoalLight,
-    navIndicatorColor: const Color(0xFF183D6E),
+    navIndicatorColor: const Color(0xFF5A3E12),
   );
 
   static ThemeData _buildTheme({

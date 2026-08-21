@@ -8,15 +8,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'config/theme.dart';
+import 'services/cache_service.dart';
 import 'services/firebase_options.dart';
 import 'services/notification_service.dart';
 import 'services/version_check_service.dart';
+import 'widgets/branded_splash_screen.dart';
 import 'widgets/force_update_dialog.dart';
 import 'widgets/immersive_category_grid.dart';
+import 'widgets/settings_screen.dart';
 
 
 // ⭐ ADD THESE GLOBAL CONSTANTS (they were missing)
@@ -74,20 +78,51 @@ class GurdwaraApp extends ConsumerStatefulWidget {
 
 class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
   final VersionCheckService _versionCheckService = VersionCheckService();
+  bool _showSplash = true;
+  ThemeMode _themeMode = ThemeMode.system;
 
   @override
   void initState() {
     super.initState();
-    _checkForUpdate();
+    _bootSequence();
+    _loadThemeMode();
   }
 
-  /// Runs the version check on startup and shows the force-update dialog
-  /// if the installed version is below the minimum required version.
-  Future<void> _checkForUpdate() async {
-    final result = await _versionCheckService.checkForUpdate();
-    if (!mounted || !result.updateRequired) return;
+  /// Loads the user's theme preference from SharedPreferences.
+  Future<void> _loadThemeMode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final mode = prefs.getString('theme_mode') ?? 'system';
+      final themeMode = switch (mode) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      };
+      if (mounted) {
+        setState(() => _themeMode = themeMode);
+      }
+    } catch (_) {
+      // Keep system default.
+    }
+  }
 
-    // Show the dialog after the first frame so the app UI is ready.
+  /// Shows the branded splash screen with a minimum display duration,
+  /// then fades into the main app.
+  Future<void> _bootSequence() async {
+    // Run version check and splash timer in parallel.
+    final results = await Future.wait([
+      _versionCheckService.checkForUpdate(),
+      Future.delayed(const Duration(milliseconds: 1800)),
+    ]);
+
+    if (!mounted) return;
+
+    setState(() => _showSplash = false);
+
+    final result = results[0] as VersionCheckResult;
+    if (!result.updateRequired) return;
+
+    // Show the force-update dialog after the splash fades out.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       showForceUpdateDialog(context, result);
@@ -101,8 +136,15 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      home: const HomeScreen(),
+      themeMode: _themeMode,
+      home: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 500),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        child: _showSplash
+            ? const BrandedSplashScreen()
+            : const HomeScreen(),
+      ),
     );
   }
 }
@@ -132,6 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onCalendarSelected: () => _selectTab(1),
           onGallerySelected: () => _selectTab(2),
           onAboutSelected: () => _selectTab(3),
+          onSettingsSelected: () => _selectTab(4),
         );
       case 1:
         return const CalendarScreen();
@@ -139,11 +182,14 @@ class _HomeScreenState extends State<HomeScreen> {
         return GalleryScreen();
       case 3:
         return const AboutScreen();
+      case 4:
+        return const SettingsScreen();
       default:
         return HomeScreenContent(
           onCalendarSelected: () => _selectTab(1),
           onGallerySelected: () => _selectTab(2),
           onAboutSelected: () => _selectTab(3),
+          onSettingsSelected: () => _selectTab(4),
         );
     }
   }
@@ -151,7 +197,27 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _buildScreen(_selectedIndex),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.03, 0),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            ),
+          );
+        },
+        child: KeyedSubtree(
+          key: ValueKey(_selectedIndex),
+          child: _buildScreen(_selectedIndex),
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: _selectTab,
@@ -176,6 +242,11 @@ class _HomeScreenState extends State<HomeScreen> {
             selectedIcon: Icon(Icons.info),
             label: 'About',
           ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
+          ),
         ],
       ),
     );
@@ -188,11 +259,13 @@ class HomeScreenContent extends StatefulWidget {
     required this.onCalendarSelected,
     required this.onGallerySelected,
     required this.onAboutSelected,
+    this.onSettingsSelected,
   });
 
   final VoidCallback onCalendarSelected;
   final VoidCallback onGallerySelected;
   final VoidCallback onAboutSelected;
+  final VoidCallback? onSettingsSelected;
 
   @override
   State<HomeScreenContent> createState() => _HomeScreenContentState();
@@ -290,13 +363,13 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Welcome card with immersive gradient style
+            // Welcome card with immersive gradient style (brand colors)
             SizedBox(
               width: double.infinity,
               child: _ImmersiveInfoCard(
                 gradientColors: const [
-                  Color(0xFF667EEA), // Deep periwinkle
-                  Color(0xFF764BA2), // Rich purple
+                  Color(0xFFE8A838), // Saffron
+                  Color(0xFFC5851E), // Saffron Dark
                 ],
                 child: Column(
                   children: [
@@ -311,17 +384,18 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                         height: 1.3,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 10),
+                    // Today's date badge (replaces "WELCOME : Guest")
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
+                        horizontal: 12,
+                        vertical: 5,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: Colors.white.withValues(alpha: 0.25),
                           width: 0.5,
                         ),
                       ),
@@ -329,15 +403,26 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                         borderRadius: BorderRadius.circular(20),
                         child: BackdropFilter(
                           filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                          child: Text(
-                            'WELCOME : Guest',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.calendar_today_rounded,
+                                color: Colors.white,
+                                size: 13,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                DateFormat('EEEE, d MMMM yyyy').format(DateTime.now()),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.95),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -347,13 +432,13 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               ),
             ),
             const SizedBox(height: 12),
-            // Upcoming Events card with immersive gradient style
+            // Upcoming Events card with immersive gradient style (brand navy)
             SizedBox(
               width: double.infinity,
               child: _ImmersiveInfoCard(
                 gradientColors: const [
-                  Color(0xFF43E97B), // Emerald
-                  Color(0xFF38F9D7), // Mint
+                  Color(0xFF1B365D), // Navy
+                  Color(0xFF2A4B7C), // Navy Light
                 ],
                 child: UpcomingEventsCard(events: events),
               ),
@@ -415,6 +500,16 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                     Color(0xFFFEE140), // Yellow
                   ],
                   onTap: widget.onAboutSelected,
+                ),
+                ImmersiveCategory(
+                  title: 'Settings',
+                  subtitle: 'Preferences & theme',
+                  icon: Icons.settings_rounded,
+                  gradientColors: const [
+                    Color(0xFF43E97B), // Emerald
+                    Color(0xFF38F9D7), // Mint
+                  ],
+                  onTap: widget.onSettingsSelected ?? () {},
                 ),
               ],
             ),
@@ -835,10 +930,35 @@ class _UpcomingEventsCardState extends State<UpcomingEventsCard> {
         ),
         const SizedBox(height: 8),
         if (events.isEmpty)
-          Text(
-            'No event data available.',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.event_available_rounded,
+                  size: 40,
+                  color: Colors.white.withValues(alpha: 0.5),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'No events this week',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Check the calendar for upcoming events.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           )
         else
@@ -1037,18 +1157,21 @@ class HomepageEvent {
 
 // lib/main.dart
 
-Future<List<HomepageEvent>> _fetchUpcomingEvents() async {
-  final response = await _dio.get<String>(_eventsUrl);
-  final text = response.data ?? '';
-  final events = parseHomepageEvents(text); // ⭐ Changed from _parseHomepageEvents
+const String _eventsCacheKey = 'events';
 
+/// Fetches the events list, with offline caching:
+/// 1. First tries the network (with a 10s timeout via _dio)
+/// 2. On success, caches the raw response text
+/// 3. On network failure, falls back to the cached copy (if any)
+Future<List<HomepageEvent>> _fetchUpcomingEvents() async {
+  final events = await _fetchEventsWithCache();
   if (events.isEmpty) {
     throw Exception('No upcoming events found.');
   }
 
-  final today = dateOnly(DateTime.now()); // ⭐ Changed from _dateOnly
+  final today = dateOnly(DateTime.now());
   final upcoming = events.where((event) {
-    final eventDate = dateOnly(event.date); // ⭐ Changed from _dateOnly
+    final eventDate = dateOnly(event.date);
     return !eventDate.isBefore(today);
   }).toList();
 
@@ -1056,15 +1179,37 @@ Future<List<HomepageEvent>> _fetchUpcomingEvents() async {
 }
 
 Future<List<HomepageEvent>> _fetchAllEvents() async {
-  final response = await _dio.get<String>(_eventsUrl);
-  final text = response.data ?? '';
-  final events = parseHomepageEvents(text); // ⭐ Changed from _parseHomepageEvents
-
+  final events = await _fetchEventsWithCache();
   if (events.isEmpty) {
     throw Exception('No events found.');
   }
-
   return events;
+}
+
+/// Shared cache-aware fetcher for the events file.
+Future<List<HomepageEvent>> _fetchEventsWithCache() async {
+  try {
+    final response = await _dio.get<String>(_eventsUrl);
+    final text = response.data ?? '';
+    final events = parseHomepageEvents(text);
+
+    if (events.isNotEmpty) {
+      // Cache the raw text for offline use.
+      await CacheService.instance.putWithTimestamp(_eventsCacheKey, text);
+    }
+
+    return events;
+  } on Exception {
+    // Network failure — try cached copy (if any).
+    final cached = await CacheService.instance.get(
+      _eventsCacheKey,
+      maxAge: const Duration(days: 7),
+    );
+    if (cached != null && cached.isNotEmpty) {
+      return parseHomepageEvents(cached);
+    }
+    rethrow;
+  }
 }
 
 Map<DateTime, List<HomepageEvent>> _groupEventsByDate(List<HomepageEvent> events) {
@@ -1129,6 +1274,7 @@ class CalendarScreen extends StatefulWidget {
 class _CalendarScreenState extends State<CalendarScreen> {
   late Future<List<HomepageEvent>> _future;
   int _monthOffset = 0;
+  bool _showListView = false;
 
   @override
   void initState() {
@@ -1157,6 +1303,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void _nextMonth() {
     setState(() {
       _monthOffset++;
+    });
+  }
+
+  void _jumpToToday() {
+    setState(() {
+      _monthOffset = 0;
     });
   }
 
@@ -1319,21 +1471,146 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   'Calendar',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: _CalendarMonthCard(
-                    month: _visibleMonth,
-                    groupedEvents: groupedEvents,
-                    onPreviousMonth: _previousMonth,
-                    onNextMonth: _nextMonth,
-                    onDateSelected: (date, eventsForDate) {
-                      _showDateDetails(context, date, eventsForDate);
+                actions: [
+                  // Toggle between month grid and list view
+                  IconButton(
+                    tooltip: _showListView ? 'Show month grid' : 'Show event list',
+                    icon: Icon(
+                      _showListView
+                          ? Icons.calendar_month_outlined
+                          : Icons.view_list_rounded,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _showListView = !_showListView;
+                      });
                     },
                   ),
-                ),
+                ],
               ),
+              if (_showListView)
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate(
+                      [
+                        // Today button
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: _jumpToToday,
+                            icon: const Icon(Icons.today_rounded, size: 18),
+                            label: const Text('Today'),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (events.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.event_busy_rounded,
+                                  size: 56,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .outline,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No events available.',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          ...events.map(
+                            (event) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Card(
+                                margin: EdgeInsets.zero,
+                                child: ListTile(
+                                  leading: Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primaryContainer
+                                          .withValues(alpha: 0.6),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          '${event.date.day}',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                        ),
+                                        Text(
+                                          DateFormat('MMM')
+                                              .format(event.date)
+                                              .toUpperCase(),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelSmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  title: Text(
+                                    event.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: event.details.isEmpty
+                                      ? null
+                                      : Text(
+                                          event.details,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                  onTap: () {
+                                    _showDateDetails(
+                                      context,
+                                      event.date,
+                                      [event],
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _CalendarMonthCard(
+                      month: _visibleMonth,
+                      groupedEvents: groupedEvents,
+                      onPreviousMonth: _previousMonth,
+                      onNextMonth: _nextMonth,
+                      onToday: _jumpToToday,
+                      onDateSelected: (date, eventsForDate) {
+                        _showDateDetails(context, date, eventsForDate);
+                      },
+                    ),
+                  ),
+                ),
             ],
           );
         },
@@ -1348,6 +1625,7 @@ class _CalendarMonthCard extends StatelessWidget {
     required this.groupedEvents,
     required this.onPreviousMonth,
     required this.onNextMonth,
+    this.onToday,
     required this.onDateSelected,
   });
 
@@ -1355,6 +1633,7 @@ class _CalendarMonthCard extends StatelessWidget {
   final Map<DateTime, List<HomepageEvent>> groupedEvents;
   final VoidCallback onPreviousMonth;
   final VoidCallback onNextMonth;
+  final VoidCallback? onToday;
   final void Function(DateTime date, List<HomepageEvent> events) onDateSelected;
 
   @override
