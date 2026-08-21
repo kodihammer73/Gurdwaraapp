@@ -407,15 +407,6 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                       _BarsiFullContent(parallax: parallax),
                 ),
                 ImmersiveCategory(
-                  title: 'Booking',
-                  subtitle: 'Coming soon',
-                  icon: Icons.event_rounded,
-                  gradientColors: const [
-                    Color(0xFF43E97B), // Emerald
-                    Color(0xFF38F9D7), // Mint
-                  ],
-                ),
-                ImmersiveCategory(
                   title: 'About',
                   subtitle: 'Our community',
                   icon: Icons.info_rounded,
