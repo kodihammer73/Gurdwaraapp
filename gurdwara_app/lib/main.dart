@@ -12,9 +12,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'config/theme.dart';
 import 'services/cache_service.dart';
 import 'services/firebase_options.dart';
+import 'services/localization_service.dart';
 import 'services/notification_service.dart';
 import 'services/version_check_service.dart';
 import 'widgets/branded_splash_screen.dart';
@@ -22,6 +24,8 @@ import 'widgets/force_update_dialog.dart';
 import 'widgets/immersive_category_grid.dart';
 import 'widgets/onboarding_screen.dart';
 import 'widgets/settings_screen.dart';
+import 'widgets/whats_new_screen.dart';
+
 
 
 // ⭐ ADD THESE GLOBAL CONSTANTS (they were missing)
@@ -46,9 +50,9 @@ void main() async {
   // Android: google-services.json auto-initializes Firebase
   // iOS/others: need explicit initialization
   try {
-    final firebaseApp = Firebase.app();
-    print('ℹ️ Firebase already initialized');
+    Firebase.app();
   } on Exception {
+
     try {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
@@ -89,7 +93,9 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
     _bootSequence();
     _loadThemeMode();
     _checkOnboarding();
+    LocalizationService.instance.load();
   }
+
 
   /// Checks whether the user has seen the onboarding screen before.
   /// If not, shows it after the splash.
@@ -116,7 +122,12 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
     if (mounted) {
       setState(() => _showOnboarding = false);
     }
+    // Show the one-time "What's New" sheet after onboarding completes.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowWhatsNew(context);
+    });
   }
+
 
   /// Loads the user's theme preference from SharedPreferences.
   Future<void> _loadThemeMode() async {
@@ -203,11 +214,40 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    // Register the deep-link handler so tapping a push notification
+    // navigates to the relevant tab (e.g. Calendar for event reminders).
+    NotificationService.onNotificationTap = _handleNotificationTap;
+  }
+
+  @override
+  void dispose() {
+    NotificationService.onNotificationTap = null;
+    super.dispose();
+  }
+
+
+  /// Maps a notification screen name to a bottom-nav tab index.
+  void _handleNotificationTap(String screen) {
+    final index = switch (screen) {
+      'home' => 0,
+      'calendar' => 1,
+      'gallery' => 2,
+      'about' => 3,
+      'settings' => 4,
+      _ => 1, // Default to Calendar for event notifications.
+    };
+    _selectTab(index);
+  }
+
   void _selectTab(int index) {
     setState(() {
       _selectedIndex = index;
     });
   }
+
 
   Widget _buildScreen(int index) {
     switch (index) {
@@ -317,6 +357,7 @@ class HomeScreenContent extends StatefulWidget {
 
 class _HomeScreenContentState extends State<HomeScreenContent> {
   late Future<List<HomepageEvent>> _future;
+  DateTime? _lastUpdated;
 
   @override
   void initState() {
@@ -329,7 +370,11 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
       _future = _fetchUpcomingEvents();
     });
     await _future;
+    if (mounted) {
+      setState(() => _lastUpdated = DateTime.now());
+    }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -529,6 +574,31 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               ),
             ),
             const SizedBox(height: 12),
+            // Quick actions: Call, Directions, WhatsApp
+            _QuickActionsRow(),
+            const SizedBox(height: 12),
+            // "Last updated" hint (shown after a pull-to-refresh)
+            if (_lastUpdated != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.sync_rounded,
+                      size: 14,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${LocalizationService.instance.t('last_updated')} '
+                      '${DateFormat('h:mm a').format(_lastUpdated!)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
             // Upcoming Events card with immersive gradient style (brand navy)
             SizedBox(
               width: double.infinity,
@@ -541,6 +611,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               ),
             ),
             const SizedBox(height: 12),
+
             // Section header
             Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 4),
@@ -619,7 +690,110 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
   TextTheme themeText(BuildContext context) => Theme.of(context).textTheme;
 }
 
+/// A row of quick-action chips (Call, Directions, WhatsApp) shown under the
+/// hero banner on the Home screen. Uses url_launcher to open the relevant app.
+class _QuickActionsRow extends StatelessWidget {
+  const _QuickActionsRow();
+
+  static const String _phoneNumber = '+6062811809';
+  static const String _whatsAppNumber = '60162811809';
+  static const String _mapsQuery =
+      'Gurdwara Sahib Melaka, Jalan Tengkera, Melaka';
+
+  Future<void> _launch(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = [
+      _QuickAction(
+        icon: Icons.call_rounded,
+        label: LocalizationService.instance.t('call'),
+        color: const Color(0xFF43E97B),
+        onTap: () => _launch('tel:$_phoneNumber'),
+      ),
+
+      _QuickAction(
+        icon: Icons.directions_rounded,
+        label: LocalizationService.instance.t('directions'),
+        color: const Color(0xFF667EEA),
+        onTap: () => _launch(
+          'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(_mapsQuery)}',
+        ),
+      ),
+      _QuickAction(
+        icon: Icons.chat_rounded,
+        label: LocalizationService.instance.t('whatsapp'),
+        color: const Color(0xFF25D366),
+        onTap: () => _launch(
+          'https://wa.me/$_whatsAppNumber',
+        ),
+      ),
+    ];
+
+    return Row(
+      children: [
+        for (var i = 0; i < actions.length; i++) ...[
+          Expanded(child: actions[i]),
+          if (i != actions.length - 1) const SizedBox(width: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// A reusable card with immersive gradient styling (matching the category grid aesthetic).
+
 /// Wraps any child widget with a vibrant gradient background, soft shadows,
 /// and decorative geometric shapes.
 class _ImmersiveInfoCard extends StatelessWidget {
@@ -812,9 +986,8 @@ class _BarsiFullContent extends StatefulWidget {
 }
 
 class _BarsiFullContentState extends State<_BarsiFullContent> {
-  static const String _barsidatesUrl = '$_siteBaseUrl/barsidates.txt';
-
   late Future<_BarsiEvent> _future;
+
 
   @override
   void initState() {
@@ -1980,10 +2153,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_selectedCategory == null && _future != null) {
+      if (_selectedCategory == null) {
         _future.then((data) {
-          if (data != null && data.categories.isNotEmpty) {
+          if (data.categories.isNotEmpty) {
             final firstCategory = data.categories.first;
+
             _selectedCategory = firstCategory;
 
             if (data.categoryYears[firstCategory]!.isNotEmpty) {
@@ -2967,9 +3141,25 @@ class _AboutScreenState extends State<AboutScreen> {
     String address = '';
     String mapUrl = '';
 
+    // Offline-first: try the network, fall back to the cached copy.
+    String contactRaw;
     try {
       final contactResponse = await _dio.get<String>('$_siteBaseUrl/contact_data.json');
-      final contactJson = jsonDecode(contactResponse.data ?? '{}');
+      contactRaw = contactResponse.data ?? '';
+      if (contactRaw.isNotEmpty) {
+        await CacheService.instance.putWithTimestamp('about_contact', contactRaw);
+      }
+    } on Exception {
+      contactRaw = await CacheService.instance.get(
+            'about_contact',
+            maxAge: const Duration(days: 7),
+          ) ??
+          '';
+    }
+
+    try {
+      final contactJson = jsonDecode(contactRaw.isEmpty ? '{}' : contactRaw);
+
 
       final executiveList = contactJson['executiveCommittee'] as List<dynamic>? ?? [];
       for (final member in executiveList) {

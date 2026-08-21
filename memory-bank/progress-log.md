@@ -551,7 +551,30 @@ Two iOS build actions were running at the same time for commits `002d6ed` and `c
 - Gallery enhancements (masonry layout, share button)
 - Language selection (English/Malay/Punjabi)
 
+## Session 19: Push Deep Linking, Quick Actions, Language Toggle, Offline About & Cleanup (2026-08-21)
+
+### Completed
+- [x] **Push Notification Deep Linking**: Added `NotificationService.onNotificationTap` static callback; `_HomeScreenState` registers it and maps a notification's `screen` payload to the matching bottom-nav tab (defaults to Calendar for event reminders)
+- [x] **Pull-to-Refresh "Last Updated" Hint**: Home screen now shows a small "Updated h:mm" hint (with sync icon) after a pull-to-refresh completes
+- [x] **Offline-First About Page**: `_fetchAboutData` now caches `contact_data.json` via `CacheService` (7-day expiry) and falls back to the cached copy on network failure
+- [x] **Language Toggle (English/Malay/Punjabi)**: Added a Language section to the Settings screen using the existing `LocalizationService` + `AppLanguage` enum; the screen rebuilds on language change via a `ValueNotifier` listener
+- [x] **Home Quick Actions**: Added a `_QuickActionsRow` under the hero banner with Call (`tel:`), Directions (Google Maps), and WhatsApp (`wa.me`) chips using `url_launcher`
+- [x] **"What's New" Screen**: Wired `maybeShowWhatsNew(context)` to show the one-time changelog sheet after onboarding completes
+- [x] **Analyzer Cleanup**: Removed unused `firebaseApp` variable, unused `theme` variable, unused `_barsidatesUrl` field, unnecessary null comparisons, and unused `dart:convert` import
+- [x] `flutter analyze` — zero warnings/errors (only `avoid_print` info-level suggestions remain)
+
+### Key Changes
+1. **`lib/services/notification_service.dart`** (modified): Added `onNotificationTap` static callback; `_handleNotificationTap` reads the `screen` payload and invokes the callback
+2. **`lib/main.dart`** (modified): Registered the deep-link callback in `_HomeScreenState`; added `_lastUpdated` state + hint on Home; added `_QuickActionsRow`/`_QuickAction` widgets; cached About contact data; wired `maybeShowWhatsNew`; cleaned up analyzer warnings
+3. **`lib/widgets/settings_screen.dart`** (modified): Added Language section with `AppLanguage` radio list; listens to `LocalizationService.instance.language` to rebuild on change
+
+### Next Steps
+- When ready, re-add the Booking card and implement the booking screen
+- Gallery enhancements (masonry layout, share button)
+- Apply localization strings more broadly across all screens
+
 ## Development Starting Points
+
 
 
 

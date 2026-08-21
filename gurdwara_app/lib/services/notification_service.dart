@@ -1,7 +1,7 @@
 // lib/services/notification_service.dart
 
-import 'dart:convert';
 import 'dart:ui';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -20,11 +20,16 @@ class NotificationService {
   static const String _eventsUrl = '$_siteBaseUrl/events.txt';
   static const String _registerDeviceUrl = '$_siteBaseUrl/api/register_device.php';
   static const String _workManagerTask = 'event_notification_task';
-  
+
+  /// Callback invoked when a notification is tapped while the app is open.
+  /// The app registers this so it can navigate to the relevant screen.
+  static void Function(String screen)? onNotificationTap;
+
   final FlutterLocalNotificationsPlugin _localNotifications = 
       FlutterLocalNotificationsPlugin();
   final Dio _dio = Dio();
   late SharedPreferences _prefs;
+
 
   Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
@@ -254,9 +259,13 @@ class NotificationService {
   }
 
   void _handleNotificationTap(RemoteMessage message) {
-    print('Notification tapped: ${message.data}');
-    // TODO: Navigate to specific screen based on message.data
+    // Determine the target screen from the notification payload.
+    // Default to the Calendar tab for event notifications.
+    final data = message.data;
+    final screen = (data['screen'] as String?) ?? 'calendar';
+    onNotificationTap?.call(screen);
   }
+
 
   /// Register this device's FCM token with the backend server
   Future<void> _registerDeviceToken(String token) async {
