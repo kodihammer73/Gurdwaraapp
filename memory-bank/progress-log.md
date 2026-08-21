@@ -485,6 +485,34 @@ Two iOS build actions were running at the same time for commits `002d6ed` and `c
 ### Next Steps
 - When ready to work on booking, add the Booking `ImmersiveCategory` back to the grid and implement the booking screen
 
+## Session 16: Mobile App Beautification & Enhancements (2026-08-21)
+
+### Completed
+- [x] **Theme Color Fix**: Replaced blue/green/red color scheme with brand palette — Saffron (#E8A838), Navy (#1B365D), Gold (#C5A028), Cream (#FAF8F5)
+- [x] **Branded Splash Screen**: New `branded_splash_screen.dart` — saffron→navy gradient with logo, fade-in + scale animation
+- [x] **Smooth Page Transitions**: Fade + slide animation between bottom nav tabs (AnimatedSwitcher)
+- [x] **Home Screen Hero**: Welcome card now uses saffron gradient, replaced "WELCOME : Guest" with today's date badge
+- [x] **Offline Caching**: New `cache_service.dart` — events data cached with SharedPreferences (7-day expiry), falls back to cache on network failure
+- [x] **Calendar Enhancements**: List view toggle (month grid ↔ event list), "Today" button, date badge tiles in list view
+- [x] **Better Empty States**: Illustrated empty state on home "Upcoming Events" card (icon + friendly message)
+- [x] **Settings Screen**: New 5th tab + home grid card — notification toggle, theme mode selection (system/light/dark), about section
+- [x] Theme mode preference persisted in SharedPreferences and applied at app startup
+- [x] `flutter analyze` — no new errors (only pre-existing warnings remain)
+- [x] Committed (commit `617cbb0`) and pushed to GitHub (`6b2cccd..617cbb0 main -> main`)
+
+### Key Changes
+1. **`lib/config/theme.dart`**: Complete brand color overhaul — primary = saffron, secondary = navy, tertiary = gold, cream background
+2. **`lib/widgets/branded_splash_screen.dart`** (new): Splash with logo on saffron→navy gradient + animations
+3. **`lib/services/cache_service.dart`** (new): SharedPreferences-based caching with timestamps and expiry
+4. **`lib/widgets/settings_screen.dart`** (new): Settings with notification toggle + theme override
+5. **`lib/main.dart`**: Splash integration, tab transitions, theme mode loading, calendar list view, better empty states, Settings tab + card
+
+### Next Steps
+- Push notification deep linking (open relevant screen on notification tap)
+- Gallery enhancements (masonry layout, swipe between full-screen images, share button)
+- Onboarding screen for first-time users
+- Language selection (English/Malay/Punjabi)
+
 ## Development Starting Points
 
 
