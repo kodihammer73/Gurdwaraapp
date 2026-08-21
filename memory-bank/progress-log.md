@@ -575,6 +575,8 @@ Two iOS build actions were running at the same time for commits `002d6ed` and `c
 - [x] **Fix**: Added a cache-busting query param `?v=2` to the hero image URL so `CachedNetworkImage` treats it as a fresh URL and re-fetches, clearing any previously cached load error
 - [x] `flutter analyze` — no new errors (only pre-existing `avoid_print` info-level suggestions remain)
 - [x] **Note**: Requires a hot restart (not just hot reload) on the device to clear the in-memory image cache
+- [x] Committed (commit `6544420`) and pushed to GitHub (`969a697..6544420 main -> main`)
+
 
 ### Next Steps
 - When ready, re-add the Booking card and implement the booking screen
