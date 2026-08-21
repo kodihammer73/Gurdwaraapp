@@ -468,6 +468,23 @@ Two iOS build actions were running at the same time for commits `002d6ed` and `c
 - Reads the actual installed build version, so it always reflects what the user has (useful for support/debugging)
 - This change modified `lib/**`, so it triggered an iOS build (expected)
 
+## Session 15: Hide Booking Card & Move About Card on Home Screen (2026-08-21)
+
+### Completed
+- [x] Removed the "Booking" immersive category card from the home screen Explore grid
+- [x] Moved the "About" immersive category card up to the 4th position (replacing Booking)
+- [x] Home screen Explore grid now shows: Calendar, Gallery, Barsi, About (clean 2×2 grid)
+- [x] Verified `flutter analyze` — no new errors (only pre-existing warnings/infos remain)
+- [x] Committed (commit `4099c93`) and pushed to GitHub (`55e7d40..4099c93 main -> main`)
+
+### Key Changes
+1. **`lib/main.dart`** (modified): Removed the `ImmersiveCategory` entry for "Booking" (subtitle: "Coming soon") and moved the "About" `ImmersiveCategory` up to take its place in the grid
+2. **Booking card**: Was a placeholder with no `onTap` handler and no booking screen — completely hidden for now
+3. **Result**: The Explore grid now has 4 cards (Calendar, Gallery, Barsi, About) forming a clean 2×2 layout
+
+### Next Steps
+- When ready to work on booking, add the Booking `ImmersiveCategory` back to the grid and implement the booking screen
+
 ## Development Starting Points
 
 
