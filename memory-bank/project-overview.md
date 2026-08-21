@@ -39,3 +39,18 @@ A modern, minimalist mobile application for Gurdwara Sahib Melaka that mirrors t
 - IDE: Visual Studio Code
 - Flutter: Installed locally
 - Git: Configured for GitHub integration
+
+## Git Repository (IMPORTANT — for future commits)
+- **Repo root**: `d:\GSM\app` (the `.git` folder is at `d:\GSM\app\.git`)
+- **Remote**: `https://github.com/kodihammer73/Gurdwaraapp.git`
+- **Branch**: `main` (tracks `origin/main`)
+- **Tracked paths are relative to `app/`**: e.g. Flutter code at `gurdwara_app/lib/main.dart`, progress log at `memory-bank/progress-log.md`
+- **Reliable command form** (use `-C`, NOT `cd ... && git` which fails due to a shell quirk):
+  ```
+  git -C d:\GSM\app status
+  git -C d:\GSM\app add <files>
+  git -C d:\GSM\app commit -m "message"
+  git -C d:\GSM\app push origin main
+  ```
+
+
