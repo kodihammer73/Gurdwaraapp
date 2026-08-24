@@ -2300,6 +2300,15 @@ class _GalleryScreenState extends State<GalleryScreen> {
       categoryYears[category] = years;
     }
 
+    // Drop any stored year selection that no longer exists for its category
+    // after a (re)load, so the dropdown value always maps to an available item.
+    for (final entry in categoryYears.entries) {
+      final stored = _selectedYear[entry.key];
+      if (stored != null && stored != 0 && !entry.value.contains(stored)) {
+        _selectedYear[entry.key] = null;
+      }
+    }
+
     return _GalleryData(
       categories: categories,
       categoryImages: categoryImages,
@@ -2547,29 +2556,47 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       ),
                       const SizedBox(height: 16),
                       if (_selectedCategory != null && data.categoryYears[_selectedCategory]!.isNotEmpty)
-                        DropdownButtonFormField<int>(
-                          decoration: InputDecoration(
-                            labelText: 'Filter by year',
-                            border: const OutlineInputBorder(),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          items: [
-                            const DropdownMenuItem<int>(
-                              value: 0,
-                              child: Text('All years'),
-                            ),
-                            for (final year in data.categoryYears[_selectedCategory]!)
-                              DropdownMenuItem<int>(
-                                value: year,
-                                child: Text('$year'),
+                        Builder(
+                          builder: (context) {
+                            final category = _selectedCategory!;
+                            final yearList = data.categoryYears[category]!;
+                            final current = _selectedYear[category];
+                            // Only select a year that still exists in this option set;
+                            // otherwise fall back to "All years" (0). The unique key forces
+                            // the FormField to reset its internal selection whenever the
+                            // option set changes, so a stale year can never violate the
+                            // "exactly one item" assertion.
+                            final initialValue =
+                                (current != null && yearList.contains(current))
+                                    ? current
+                                    : 0;
+                            return DropdownButtonFormField<int>(
+                              key: ValueKey<String>('$category:${yearList.join(',')}'),
+                              initialValue: initialValue,
+                              decoration: InputDecoration(
+                                labelText: 'Filter by year',
+                                border: const OutlineInputBorder(),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               ),
-                          ],
-                          onChanged: (value) {
-                            if (value != null && _selectedCategory != null) {
-                              setState(() {
-                                _selectedYear[_selectedCategory!] = value;
-                              });
-                            }
+                              items: [
+                                const DropdownMenuItem<int>(
+                                  value: 0,
+                                  child: Text('All years'),
+                                ),
+                                for (final year in yearList)
+                                  DropdownMenuItem<int>(
+                                    value: year,
+                                    child: Text('$year'),
+                                  ),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setState(() {
+                                    _selectedYear[category] = value;
+                                  });
+                                }
+                              },
+                            );
                           },
                         ),
                       const SizedBox(height: 16),
