@@ -5,20 +5,27 @@
 ```
 gurdwara_app/
 ├── lib/                          # Main Flutter source code
-│   ├── main.dart                 # Application entry point
-│   ├── screens/                  # UI screens
-│   │   ├── home_screen.dart
-│   │   ├── schedule_screen.dart
-│   │   ├── services_screen.dart
-│   │   └── settings_screen.dart
-│   ├── widgets/                  # Reusable UI components
-│   ├── models/                   # Data models
+│   ├── main.dart                 # Application entry point AND most screens (home,
+│   │                             #   gallery, calendar, about) — the UI is currently
+│   │                             #   concentrated here rather than split into screens/
+│   ├── config/                   # App configuration (e.g. theming: theme.dart)
 │   ├── services/                 # Business logic & API calls
-│   ├── providers/                # State management (Provider)
-│   └── utils/                    # Utility functions & constants
+│   │   ├── cache_service.dart
+│   │   ├── firebase_options.dart
+│   │   ├── localization_service.dart
+│   │   ├── notification_service.dart
+│   │   ├── shared_preferences_service.dart
+│   │   └── version_check_service.dart
+│   └── widgets/                  # Reusable/standalone UI components
+│       ├── branded_splash_screen.dart
+│       ├── force_update_dialog.dart
+│       ├── immersive_category_grid.dart
+│       ├── onboarding_screen.dart
+│       ├── settings_screen.dart
+│       └── whats_new_screen.dart
 ├── android/                      # Android-specific configuration
 │   ├── app/
-│   ├── build.gradle
+│   ├── build.gradle.kts
 │   └── gradle.properties
 ├── ios/                          # iOS-specific configuration
 │   ├── Podfile
@@ -28,6 +35,11 @@ gurdwara_app/
 ├── pubspec.lock                  # Locked dependency versions
 └── README.md                     # Project documentation
 ```
+
+> Note: this layout differs from the original project template. There is no
+> `lib/screens/`, `lib/models/`, `lib/providers/`, or `lib/utils/` — screens are
+> defined in `main.dart` (and some in `lib/widgets/`). If you later split the
+> monolith out into `lib/screens/`, update this section to match.
 
 ## Architecture Patterns
 - **State Management**: Provider + Riverpod for reactive state management

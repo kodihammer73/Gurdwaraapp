@@ -416,18 +416,51 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               title: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Image.asset(
-                    _siteLogoAsset,
-                    width: 28,
-                    height: 28,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Icon(
-                        Icons.temple_buddhist,
-                        size: 28,
-                        color: Theme.of(context).colorScheme.primary,
-                      );
-                    },
+                  // Splash-style glass tile with the saffron-filled logo
+                  Container(
+                    width: 34,
+                    height: 34,
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE8A838).withValues(alpha: 0.45),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+                        child: ColorFiltered(
+                          colorFilter: const ColorFilter.matrix(<double>[
+                            0, 0, 0, 0, 0xE8,
+                            0, 0, 0, 0, 0xA8,
+                            0, 0, 0, 0, 0x38,
+                            0, 0, 0, 1, 0,
+                          ]),
+                          child: Image.asset(
+                            'web/translogo.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Icon(
+                                Icons.temple_buddhist,
+                                size: 18,
+                                color: const Color(0xFFE8A838),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -543,14 +576,20 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          Text(
-                            'Waheguru Ji Ka Khalsa Waheguru Ji Ki Fateh',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.2,
-                              height: 1.3,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Waheguru Ji Ka Khalsa Waheguru Ji Ki Fateh',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.2,
+                                height: 1.3,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -1213,6 +1252,17 @@ class _UpcomingEventsCardState extends State<UpcomingEventsCard> {
     final events = _filteredEvents;
     final theme = Theme.of(context);
 
+    // Group the week's events into runs so a multi-day event (e.g. Akhand
+    // Path) renders as a single card listing its remaining days.
+    final runs = <String, List<HomepageEvent>>{};
+    var selfKey = 0;
+    for (final event in events) {
+      final key = event.runId.isEmpty ? '_self${selfKey++}' : event.runId;
+      runs.putIfAbsent(key, () => []).add(event);
+    }
+    final runList = runs.values.toList()
+      ..sort((a, b) => a.first.date.compareTo(b.first.date));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1259,9 +1309,12 @@ class _UpcomingEventsCardState extends State<UpcomingEventsCard> {
         else
           Column(
             children: [
-              for (var i = 0; i < events.length; i++) ...[
-                _HomepageEventTile(event: events[i]),
-                if (i != events.length - 1) const SizedBox(height: 6),
+              for (var i = 0; i < runList.length; i++) ...[
+                if (runList[i].length > 1)
+                  _EventRunCard(days: runList[i])
+                else
+                  _HomepageEventTile(event: runList[i].first),
+                if (i != runList.length - 1) const SizedBox(height: 6),
               ],
             ],
           ),
@@ -1374,6 +1427,154 @@ class _SplashLoadingState extends State<_SplashLoading>
 
 
 
+/// A card that collapses a consecutive-day run (e.g. a 3-day Akhand Path)
+/// into a single entry, listing each remaining day inline with its
+/// Start / Continue / End label and a red "live" dot on the active day.
+class _EventRunCard extends StatelessWidget {
+  const _EventRunCard({required this.days});
+
+  final List<HomepageEvent> days;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final now = DateTime.now();
+    final today = dateOnly(now);
+
+    final sorted = [...days]..sort((a, b) => a.date.compareTo(b.date));
+    final first = sorted.first;
+    final last = sorted.last;
+    final firstDayOffset = dateOnly(first.date).difference(today).inDays;
+    final palette = _eventPalette(theme, firstDayOffset, firstDayOffset == 0);
+
+    final isRunLive = first.isAkhandPath && _isAkhandRunLive(sorted, now);
+
+    String dateRange;
+    if (first.date.year == last.date.year &&
+        first.date.month == last.date.month) {
+      dateRange = '${DateFormat('d').format(first.date)} – '
+          '${DateFormat('d MMM yyyy').format(last.date)}';
+    } else {
+      dateRange = '${DateFormat('d MMM').format(first.date)} – '
+          '${DateFormat('d MMM yyyy').format(last.date)}';
+    }
+
+    return Card(
+      margin: EdgeInsets.zero,
+      color: palette.background,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: palette.border),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      shadowColor: palette.border.withValues(alpha: 0.16),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    first.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: palette.foreground,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  dateRange,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: palette.foreground,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            if (first.details.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                first.details,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: palette.foreground,
+                ),
+              ),
+            ],
+            const SizedBox(height: 6),
+            for (final day in sorted)
+              _dayLine(theme, palette, day, today, isRunLive, now),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dayLine(
+    ThemeData theme,
+    _EventPalette palette,
+    HomepageEvent day,
+    DateTime today,
+    bool isRunLive,
+    DateTime now,
+  ) {
+    final isToday = dateOnly(day.date) == today;
+    final isLive =
+        day.isAkhandPath ? isRunLive : _isNowLive(day, now);
+    final showLiveDot = isToday && isLive;
+
+    final String label;
+    if (isToday && isLive) {
+      label = day.status == 'single'
+          ? 'TODAY'
+          : 'TODAY · ${_statusLabel(day).toUpperCase()}';
+    } else {
+      label = _statusLabel(day);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(
+            showLiveDot ? Icons.circle : Icons.circle_outlined,
+            size: 10,
+            color: showLiveDot
+                ? const Color(0xFFD32F2F)
+                : palette.foreground.withValues(alpha: 0.7),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            DateFormat('d MMM').format(day.date),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: palette.foreground,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              label,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: palette.foreground,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HomepageEventTile extends StatelessWidget {
   const _HomepageEventTile({required this.event});
 
@@ -1437,14 +1638,32 @@ class _HomepageEventTile extends StatelessWidget {
                 ),
               ),
             ],
-            if (isToday) ...[
+            if (isToday && _isNowLive(event, DateTime.now())) ...[
               const SizedBox(height: 4),
-              Text(
-                'Ongoing now',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: palette.foreground,
-                  fontWeight: FontWeight.w800,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFFD32F2F),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      event.status == 'single'
+                          ? 'TODAY'
+                          : 'TODAY · ${_statusLabel(event).toUpperCase()}',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: palette.foreground,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ],
@@ -1498,11 +1717,15 @@ _EventPalette _eventPalette(ThemeData theme, int dayOffset, bool isToday) {
 }
 
 class HomepageEvent {
-  const HomepageEvent({
+  HomepageEvent({
     required this.title,
     required this.date,
     required this.details,
     required this.imagePath,
+    this.host = '',
+    this.startAt,
+    this.status = 'single',
+    this.runId = '',
   });
 
   final String title;
@@ -1510,7 +1733,24 @@ class HomepageEvent {
   final String details;
   final String imagePath;
 
+  /// Host extracted from the description (e.g. "Jagraj Singh (Sg)").
+  final String host;
+
+  /// The parsed start datetime (event date + "@9am" time), or null if none.
+  final DateTime? startAt;
+
+  /// Run position within a consecutive-day group:
+  /// 'single' | 'start' | 'cont' | 'end'.
+  String status;
+
+  /// ID shared by all events belonging to the same consecutive-day run.
+  String runId;
+
   String? get imageUrl => imagePath.isEmpty ? null : imagePath;
+
+  bool get isAkhandPath => title.toLowerCase().contains('akhand path');
+
+  bool get isAsaDiVaar => title.trim().toLowerCase() == 'asa di vaar';
 }
 
 // lib/main.dart
@@ -1581,6 +1821,137 @@ Map<DateTime, List<HomepageEvent>> _groupEventsByDate(List<HomepageEvent> events
   return grouped;
 }
 
+/// Host extracted from a description, mirroring the website's `extractHost`.
+String _extractHost(String description) {
+  final m = RegExp(r'by\s+([^@\n]+)', caseSensitive: false).firstMatch(description);
+  if (m == null) return '';
+  final host = m.group(1)!.trim().replaceAll(RegExp(r'\s+'), ' ');
+  return host.isEmpty ? '' : host;
+}
+
+/// Parses an "@9am" / "@6.30am" / "@3.30pm" style time from a description and
+/// returns the full DateTime on the given event date, or null if no time found.
+DateTime? _parseStartAt(String details, DateTime date) {
+  final m = RegExp(r'@\s*(\d{1,2}(?:\.\d{1,2})?)\s*([ap])m',
+          caseSensitive: false)
+      .firstMatch(details);
+  if (m == null) return null;
+
+  final timePart = m.group(1)!;
+  final isPm = m.group(2)!.toLowerCase() == 'p';
+
+  int hour;
+  int minute = 0;
+  if (timePart.contains('.')) {
+    final parts = timePart.split('.');
+    hour = int.parse(parts[0]);
+    minute = int.parse(parts[1]);
+  } else {
+    hour = int.parse(timePart);
+  }
+
+  if (isPm && hour != 12) hour += 12;
+  if (!isPm && hour == 12) hour = 0;
+
+  return DateTime(date.year, date.month, date.day, hour, minute);
+}
+
+/// Group key used to chain consecutive-day events (title + host parity with
+/// the website's `getGroupKey`).
+String _groupKeyFor(HomepageEvent e) {
+  final title = e.title.toLowerCase().trim();
+  final host = e.host.toLowerCase().trim();
+  return host.isEmpty ? title : '$title|$host';
+}
+
+bool _isConsecutiveDay(DateTime a, DateTime b) {
+  return dateOnly(b).difference(dateOnly(a)).inDays == 1;
+}
+
+/// Groups events by title+host, sorts each group by date, and assigns each
+/// event a [status] ('single'/'start'/'cont'/'end') and a shared [runId].
+void _assignRunMetadata(List<HomepageEvent> events) {
+  final groups = <String, List<HomepageEvent>>{};
+  for (final event in events) {
+    groups.putIfAbsent(_groupKeyFor(event), () => []).add(event);
+  }
+
+  var runCounter = 0;
+  for (final group in groups.values) {
+    if (group.isEmpty) continue;
+    group.sort((a, b) => a.date.compareTo(b.date));
+
+    final runId = 'run${runCounter++}';
+    for (var i = 0; i < group.length; i++) {
+      final curr = group[i];
+      final prev = i > 0 ? group[i - 1] : null;
+      final next = i < group.length - 1 ? group[i + 1] : null;
+
+      final isStart = prev == null || !_isConsecutiveDay(prev.date, curr.date);
+      final isEnd = next == null || !_isConsecutiveDay(curr.date, next.date);
+
+      String status;
+      if (isStart && !isEnd) {
+        status = 'start';
+      } else if (!isStart && !isEnd) {
+        status = 'cont';
+      } else if (!isStart && isEnd) {
+        status = 'end';
+      } else {
+        status = 'single';
+      }
+
+      curr.status = status;
+      // Only Akhand Path is a genuine continuous multi-day programme — assign
+      // a shared runId so it collapses into one card. Other events (e.g. Asa
+      // Di Vaar) keep an empty runId so each day renders as its own card.
+      curr.runId = curr.isAkhandPath ? runId : '';
+    }
+  }
+}
+
+/// True when [now] falls inside [start] .. [start + hours].
+bool _inLiveWindow(DateTime start, DateTime now, int hours) {
+  final end = start.add(Duration(hours: hours));
+  return !now.isBefore(start) && now.isBefore(end);
+}
+
+/// Per-event live (red dot) check for single-day events.
+/// - Asa Di Vaar: 2 hours from its start time.
+/// - Everything else: 4 hours from its start time.
+bool _isNowLive(HomepageEvent e, DateTime now) {
+  final start = e.startAt;
+  if (start == null) return false;
+  final hours = e.isAsaDiVaar ? 2 : 4;
+  return _inLiveWindow(start, now, hours);
+}
+
+/// Run-level live (red dot) check for a multi-day Akhand Path: from the run's
+/// first-day start time through the last day's start time + 4 hours.
+bool _isAkhandRunLive(List<HomepageEvent> days, DateTime now) {
+  final sorted = [...days]..sort((a, b) => a.date.compareTo(b.date));
+  final first = sorted.first;
+  final last = sorted.last;
+  final start = first.startAt;
+  if (start == null) return false;
+  final spanDays = dateOnly(last.date).difference(dateOnly(first.date)).inDays;
+  return _inLiveWindow(start, now, spanDays * 24 + 4);
+}
+
+/// Plain label for a run position (used for non-live days).
+String _statusLabel(HomepageEvent e) {
+  switch (e.status) {
+    case 'start':
+      return 'Start';
+    case 'cont':
+      return 'Continue';
+    case 'end':
+      return 'End';
+    default:
+      return 'Today';
+  }
+}
+
 List<HomepageEvent> parseHomepageEvents(String text) {
   final events = <HomepageEvent>[];
 
@@ -1604,15 +1975,21 @@ List<HomepageEvent> parseHomepageEvents(String text) {
       continue;
     }
 
+    final startAt = _parseStartAt(details, date);
+
     events.add(
       HomepageEvent(
         title: title,
         date: date,
         details: details,
         imagePath: imagePath,
+        host: _extractHost(details),
+        startAt: startAt,
       ),
     );
   }
+
+  _assignRunMetadata(events);
 
   events.sort((a, b) => a.date.compareTo(b.date));
   return events;
