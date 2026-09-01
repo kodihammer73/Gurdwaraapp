@@ -1235,16 +1235,11 @@ class UpcomingEventsCard extends StatefulWidget {
 class _UpcomingEventsCardState extends State<UpcomingEventsCard> {
   List<HomepageEvent> get _filteredEvents {
     final today = dateOnly(DateTime.now());
-    // Calculate the next Sunday (end of the current week)
-    final daysUntilSunday = DateTime.sunday - today.weekday;
-    final endOfWeek = today.add(Duration(days: daysUntilSunday));
-
-    final filtered = widget.events.where((event) {
-      final eventDate = dateOnly(event.date);
-      return !eventDate.isBefore(today) && !eventDate.isAfter(endOfWeek);
-    }).toList();
-
-    return filtered;
+    // Show a rolling window from today (three-day minimum), expanding to the
+    // next Sunday on non-weekend days. Saturday shows through Monday and
+    // Sunday shows through Tuesday. Started Akhand Path runs are expanded to
+    // include all their remaining days.
+    return filterUpcomingWindow(widget.events, today);
   }
 
   @override
@@ -1260,8 +1255,11 @@ class _UpcomingEventsCardState extends State<UpcomingEventsCard> {
       final key = event.runId.isEmpty ? '_self${selfKey++}' : event.runId;
       runs.putIfAbsent(key, () => []).add(event);
     }
+    // Sort runs so that live entries float to the top, then by start time (so
+    // two same-day events at 9am and 4pm appear by time), then by date. A run
+    // with any currently-live day is promoted to the top.
     final runList = runs.values.toList()
-      ..sort((a, b) => a.first.date.compareTo(b.first.date));
+      ..sort((a, b) => compareEntriesLiveNow(a, b, DateTime.now()));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1447,8 +1445,6 @@ class _EventRunCard extends StatelessWidget {
     final firstDayOffset = dateOnly(first.date).difference(today).inDays;
     final palette = _eventPalette(theme, firstDayOffset, firstDayOffset == 0);
 
-    final isRunLive = first.isAkhandPath && _isAkhandRunLive(sorted, now);
-
     String dateRange;
     if (first.date.year == last.date.year &&
         first.date.month == last.date.month) {
@@ -1510,7 +1506,10 @@ class _EventRunCard extends StatelessWidget {
             ],
             const SizedBox(height: 6),
             for (final day in sorted)
-              _dayLine(theme, palette, day, today, isRunLive, now),
+              // Each day's red indicator is lit independently: day 1 from its
+              // start time to 23:59, middle days 00:00-23:59, and the last day
+              // from 00:00 to its start time + 4 hours.
+              _dayLine(theme, palette, day, today, now),
           ],
         ),
       ),
@@ -1522,12 +1521,11 @@ class _EventRunCard extends StatelessWidget {
     _EventPalette palette,
     HomepageEvent day,
     DateTime today,
-    bool isRunLive,
     DateTime now,
   ) {
     final isToday = dateOnly(day.date) == today;
     final isLive =
-        day.isAkhandPath ? isRunLive : _isNowLive(day, now);
+        day.isAkhandPath ? isAkhandDayLive(day, now) : isNowLive(day, now);
     final showLiveDot = isToday && isLive;
 
     final String label;
@@ -1638,7 +1636,7 @@ class _HomepageEventTile extends StatelessWidget {
                 ),
               ),
             ],
-            if (isToday && _isNowLive(event, DateTime.now())) ...[
+            if (isToday && isNowLive(event, DateTime.now())) ...[
               const SizedBox(height: 4),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -1831,7 +1829,7 @@ String _extractHost(String description) {
 
 /// Parses an "@9am" / "@6.30am" / "@3.30pm" style time from a description and
 /// returns the full DateTime on the given event date, or null if no time found.
-DateTime? _parseStartAt(String details, DateTime date) {
+DateTime? parseStartAt(String details, DateTime date) {
   final m = RegExp(r'@\s*(\d{1,2}(?:\.\d{1,2})?)\s*([ap])m',
           caseSensitive: false)
       .firstMatch(details);
@@ -1919,23 +1917,78 @@ bool _inLiveWindow(DateTime start, DateTime now, int hours) {
 /// Per-event live (red dot) check for single-day events.
 /// - Asa Di Vaar: 2 hours from its start time.
 /// - Everything else: 4 hours from its start time.
-bool _isNowLive(HomepageEvent e, DateTime now) {
+bool isNowLive(HomepageEvent e, DateTime now) {
   final start = e.startAt;
   if (start == null) return false;
   final hours = e.isAsaDiVaar ? 2 : 4;
   return _inLiveWindow(start, now, hours);
 }
 
-/// Run-level live (red dot) check for a multi-day Akhand Path: from the run's
-/// first-day start time through the last day's start time + 4 hours.
-bool _isAkhandRunLive(List<HomepageEvent> days, DateTime now) {
-  final sorted = [...days]..sort((a, b) => a.date.compareTo(b.date));
-  final first = sorted.first;
-  final last = sorted.last;
-  final start = first.startAt;
-  if (start == null) return false;
-  final spanDays = dateOnly(last.date).difference(dateOnly(first.date)).inDays;
-  return _inLiveWindow(start, now, spanDays * 24 + 4);
+/// Per-day live (red dot) check for a multi-day Akhand Path, based on the
+/// programme's times on that specific day:
+/// - First day ('start'): lit from its start time through 23:59.
+/// - Middle days ('cont'): lit from 00:00 through 23:59.
+/// - Last day ('end'): lit from 00:00 through its start time + 4 hours.
+/// - Single-day Akhand Path: lit from its start time through +4 hours.
+bool isAkhandDayLive(HomepageEvent day, DateTime now) {
+  final start = day.startAt;
+  final dayStart = dateOnly(day.date);
+  final dayEnd = dayStart.add(const Duration(days: 1));
+  switch (day.status) {
+    case 'start':
+      if (start == null) return false;
+      return !now.isBefore(start) && now.isBefore(dayEnd);
+    case 'cont':
+      return !now.isBefore(dayStart) && now.isBefore(dayEnd);
+    case 'end':
+      if (start == null) return false;
+      return !now.isBefore(dayStart) &&
+          now.isBefore(start.add(const Duration(hours: 4)));
+    default: // 'single'
+      if (start == null) return false;
+      return _inLiveWindow(start, now, 4);
+  }
+}
+
+/// True when any entry in a run list is currently live. A single-day entry
+/// uses its own live check; a multi-day Akhand Path is live when any of its
+/// days is currently lit.
+bool _entriesLiveNow(List<HomepageEvent> days, DateTime now) {
+  if (days.length == 1) {
+    final e = days.first;
+    return e.isAkhandPath ? isAkhandDayLive(e, now) : isNowLive(e, now);
+  }
+  for (final day in days) {
+    if (day.isAkhandPath && isAkhandDayLive(day, now)) return true;
+  }
+  return false;
+}
+
+/// The earliest non-null start time across a run list.
+DateTime? _entriesStartAt(List<HomepageEvent> days) {
+  for (final day in days) {
+    if (day.startAt != null) return day.startAt;
+  }
+  return null;
+}
+
+/// Sort comparator for the home "Upcoming Events" run list: live entries
+/// first, then by start time, then by date. Keeps two same-day events (e.g.
+/// 9am and 4pm) in time order until one goes live, at which point it floats to
+/// the top, then falls back to time order once its +4h window ends.
+int compareEntriesLiveNow(
+    List<HomepageEvent> a, List<HomepageEvent> b, DateTime now) {
+  final aLive = _entriesLiveNow(a, now);
+  final bLive = _entriesLiveNow(b, now);
+  if (aLive != bLive) return aLive ? -1 : 1;
+
+  final aTime = _entriesStartAt(a);
+  final bTime = _entriesStartAt(b);
+  if (aTime != null && bTime != null && aTime != bTime) {
+    return aTime.compareTo(bTime);
+  }
+
+  return a.first.date.compareTo(b.first.date);
 }
 
 /// Plain label for a run position (used for non-live days).
@@ -1975,7 +2028,7 @@ List<HomepageEvent> parseHomepageEvents(String text) {
       continue;
     }
 
-    final startAt = _parseStartAt(details, date);
+    final startAt = parseStartAt(details, date);
 
     events.add(
       HomepageEvent(
@@ -1997,6 +2050,65 @@ List<HomepageEvent> parseHomepageEvents(String text) {
 
 DateTime dateOnly(DateTime dateTime) {
   return DateTime(dateTime.year, dateTime.month, dateTime.day);
+}
+
+/// Returns the inclusive end of the home "Upcoming Events" window.
+/// Normally today through the next Sunday, but with a three-day minimum so
+/// Saturday reaches Monday and Sunday reaches Tuesday.
+DateTime upcomingWindowEnd(DateTime today) {
+  final daysUntilSunday = DateTime.sunday - today.weekday;
+  final nextSunday = today.add(Duration(days: daysUntilSunday));
+  final minEnd = today.add(const Duration(days: 2)); // today + Sunday + next day
+  return minEnd.isAfter(nextSunday) ? minEnd : nextSunday;
+}
+
+/// Keys an event identity for run-expansion de-duplication.
+String _runKey(HomepageEvent e) =>
+    e.runId.isNotEmpty
+        ? '${e.runId}|${dateOnly(e.date)}'
+        : 'single|${e.title}|${dateOnly(e.date)}';
+
+/// Filters [allEvents] to the rolling "this week" window and expands any
+/// started Akhand Path run that touches the window to include all of its
+/// remaining days (so a Saturday start shows through Monday, and a Sunday
+/// start shows through Tuesday).
+List<HomepageEvent> filterUpcomingWindow(
+    List<HomepageEvent> allEvents, DateTime today) {
+  final endOfWindow = upcomingWindowEnd(today);
+  final windowEvents = allEvents.where((event) {
+    final eventDate = dateOnly(event.date);
+    return !eventDate.isBefore(today) && !eventDate.isAfter(endOfWindow);
+  }).toList();
+
+  final present = <String, HomepageEvent>{};
+  for (final e in windowEvents) {
+    present[_runKey(e)] = e;
+  }
+
+  final runIds = <String>{};
+  for (final e in windowEvents) {
+    if (e.isAkhandPath && e.runId.isNotEmpty) runIds.add(e.runId);
+  }
+
+  final added = <HomepageEvent>[];
+  for (final runId in runIds) {
+    for (final full in allEvents.where((e) =>
+        e.isAkhandPath &&
+        e.runId == runId &&
+        !dateOnly(e.date).isBefore(today))) {
+      final key = _runKey(full);
+      if (present.containsKey(key)) continue;
+      present[key] = full;
+      added.add(full);
+    }
+  }
+
+  if (added.isEmpty) return windowEvents;
+  final merged = <HomepageEvent>[];
+  merged.addAll(windowEvents);
+  merged.addAll(added);
+  merged.sort((a, b) => a.date.compareTo(b.date));
+  return merged;
 }
 
 class CalendarScreen extends StatefulWidget {
