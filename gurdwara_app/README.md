@@ -49,12 +49,22 @@ Build a debug APK:
 flutter build apk --debug
 ```
 
-Build a release APK:
+Build an obfuscated release APK:
 ```bash
-flutter build apk --release
+flutter build apk --release --obfuscate --split-debug-info=build/symbols/android
 ```
 
-Output location: `build/app/outputs/flutter-apk/app-release.apk`
+Build the Play Store App Bundle with the same options:
+```bash
+flutter build appbundle --release --obfuscate --split-debug-info=build/symbols/android
+```
+
+R8 shrinking/obfuscation and resource shrinking are enabled for Android release builds.
+Keep `build/symbols/android` private and back it up; it is required to decode Dart stack traces from Play Console crashes.
+
+Output locations:
+- APK: `build/app/outputs/flutter-apk/app-release.apk`
+- AAB: `build/app/outputs/bundle/release/app-release.aab`
 
 ### iOS IPA (GitHub Actions)
 

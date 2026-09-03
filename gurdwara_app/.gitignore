@@ -42,5 +42,8 @@ windows/flutter/ephemeral/
 *.iml
 .vscode/
 
+# Flutter obfuscation symbols (keep locally for crash deobfuscation)
+build/symbols/
+
 # Build logs
 *.log

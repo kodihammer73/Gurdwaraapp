@@ -49,9 +49,13 @@ android {
         release {
             signingConfig = signingConfigs.getByName("release")
 
-            // Optional: enable optimization for Play Store
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // Enable R8 shrinking and obfuscation for Google Play optimization.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
@@ -72,4 +76,7 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // Flutter's Android embedding references Play Core deferred-component APIs.
+    implementation("com.google.android.play:core:1.10.3")
 }
