@@ -774,10 +774,13 @@ class _QuickActionsRow extends StatelessWidget {
   /// Strips everything except digits, for use in wa.me links.
   String get _digitsOnly => phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
 
-  Future<void> _launch(String url) async {
+  Future<void> _launch(BuildContext context, String url) async {
     final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open $url')),
+      );
     }
   }
 
@@ -788,13 +791,13 @@ class _QuickActionsRow extends StatelessWidget {
         icon: Icons.call_rounded,
         label: LocalizationService.instance.t('call'),
         color: const Color(0xFF43E97B),
-        onTap: () => _launch('tel:$phoneNumber'),
+        onTap: () => _launch(context, 'tel:$phoneNumber'),
       ),
       _QuickAction(
         icon: Icons.chat_rounded,
         label: LocalizationService.instance.t('whatsapp'),
         color: const Color(0xFF25D366),
-        onTap: () => _launch('https://wa.me/$_digitsOnly'),
+        onTap: () => _launch(context, 'https://wa.me/$_digitsOnly'),
       ),
     ];
 
