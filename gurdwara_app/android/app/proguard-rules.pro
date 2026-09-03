@@ -10,3 +10,8 @@
 
 # Preserve runtime annotations used by libraries and generated code.
 -keepattributes *Annotation*
+
+# Flutter references optional Play Core deferred-component APIs. This app does
+# not use deferred components, so suppress warnings without bundling legacy
+# Play Core, which is incompatible with target SDK 34+.
+-dontwarn com.google.android.play.core.**

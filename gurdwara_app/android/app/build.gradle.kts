@@ -77,6 +77,4 @@ dependencies {
 
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 
-    // Flutter's Android embedding references Play Core deferred-component APIs.
-    implementation("com.google.android.play:core:1.10.3")
 }
