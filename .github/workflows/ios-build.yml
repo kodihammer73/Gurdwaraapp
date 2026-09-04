@@ -87,16 +87,42 @@ jobs:
         echo "Installed provisioning profile UUID: $UUID"
       shell: bash
 
-    - name: Build signed iOS app
-      run: flutter build ios --release
-
-    - name: Create IPA
+    - name: Archive & export signed IPA
       run: |
-        cd build/ios/iphoneos
-        rm -rf Payload
-        mkdir -p Payload
-        mv Runner.app Payload/
-        zip -r -y "${{ github.workspace }}/gurdwara_app.ipa" Payload/
+        set -euo pipefail
+        ARCHIVE_PATH="build/ios/archive/Runner.xcarchive"
+        EXPORT_DIR="build/ios/export"
+        xcodebuild -workspace ios/Runner.xcworkspace \
+          -scheme Runner \
+          -configuration Release \
+          -destination 'generic/platform=iOS' \
+          -archivePath "$ARCHIVE_PATH" \
+          CODE_SIGN_STYLE=Manual \
+          CODE_SIGN_IDENTITY="Apple Distribution" \
+          DEVELOPMENT_TEAM=536335249D \
+          archive
+        mkdir -p "$EXPORT_DIR"
+        cat > "$EXPORT_DIR/exportOptions.plist" <<'PLIST'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>536335249D</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+        </dict>
+        </plist>
+        PLIST
+        xcodebuild -exportArchive -archivePath "$ARCHIVE_PATH" \
+          -exportPath "$EXPORT_DIR" \
+          -exportOptionsPlist "$EXPORT_DIR/exportOptions.plist"
+        IPA_PATH=$(find "$EXPORT_DIR" -name '*.ipa' -print -quit)
+        echo "Exported IPA: $IPA_PATH"
+        cp "$IPA_PATH" "${{ github.workspace }}/gurdwara_app.ipa"
+      shell: bash
 
     - name: Upload IPA artifact
       uses: actions/upload-artifact@v4
