@@ -23,6 +23,8 @@ on:
 jobs:
   build-and-publish-ios:
     runs-on: macos-latest
+    permissions:
+      contents: write
 
     defaults:
       run:
@@ -122,14 +124,6 @@ jobs:
         name: ios-signed-ipa
         path: gurdwara_app.ipa
 
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: gurdwara_app.ipa
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
     - name: Upload to App Store Connect
       if: startsWith(github.ref, 'refs/tags/')
       env:
@@ -142,3 +136,12 @@ jobs:
         xcrun altool --upload-app -f "${{ github.workspace }}/gurdwara_app.ipa" -t ios \
           --apiKey "$API_KEY" --apiIssuer "$API_ISSUER" --verbose
       shell: bash
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      continue-on-error: true
+      with:
+        files: gurdwara_app.ipa
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
