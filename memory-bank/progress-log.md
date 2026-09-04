@@ -631,3 +631,49 @@ Two iOS build actions were running at the same time for commits `002d6ed` and `c
 
 
 
+## 2026-09-04 - iOS App Store submission (GitHub Actions signed IPA)
+
+### Goal
+Enable building a **signed** iOS .ipa via GitHub Actions and auto-upload to App Store Connect
+(Android 1.0.6 was already live on Google Play under `com.gsmelaka.mobileapp`).
+
+### What was completed
+- Apple Developer Program (Individual) enrollment active; Apple ID `hammerjit@hotmail.com`.
+- App Store Connect app record created: Bundle ID / SKU = `com.gsmelaka.mobileapp`, name decided
+  = **"Gurdwara Sahib Melaka"** (App Store), on-phone icon label stays **GSMelaka** (in code, no change).
+- Certificates, Identifiers & Profiles:
+  - Identifier `com.gsmelaka.mobileapp`.
+  - **iPhone Distribution** cert (identity: `iPhone Distribution: Hemerjit Singh (536335249D)`),
+    stored as p12 (Team ID = `536335249D`).
+  - App Store distribution provisioning profile (also stored).
+- Credentials kept locally in `D:\gsm\app\apple-certs\` (gitignored). NEVER commit this folder.
+- GitHub secrets added on repo `kodihammer73/Gurdwaraapp`:
+  `APPLE_DIST_P12`, `APPLE_DIST_P12_PASSWORD`, `APPLE_DIST_PROFILE`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`.
+  (Unused/removable: `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`, `APPLE_API_KEY_FILE` - API-key method
+  did not work for an Individual account; switched to Apple ID + App-Specific Password.)
+- Workflow `app/.github/workflows/ios-build.yml` now:
+  build unsigned -> sign with iPhone Distribution cert -> embed profile + aps-environment ->
+  package .ipa -> (on a `v*` tag only) upload to App Store Connect via `xcrun altool -u/-p`
+  -> create GitHub release.
+- `app/gurdwara_app/ios/Runner.xcodeproj/project.pbxproj`: Runner Release target signing ->
+  Manual / Apple Distribution identity / DEVELOPMENT_TEAM 536335249D (mostly informational now,
+  since CI signs manually after `--no-codesign` build).
+- Added `app/.gitignore` to exclude `apple-certs/`, `.p12`, `.p8`, `.cer`, `.key`.
+
+### Current status (as of EOD)
+- Build **1.0.6 (7)** was uploaded and submitted for review: **iOS App 1.0.6, "Waiting for Review"**
+  (Submission ID `985b5411-7eef-47e7-9e43-82cb65f3226c`, submitted Sep 4, 2026).
+- Export compliance: none / no proprietary crypto. Age rating answered all-No -> 4+,
+  Age category "Not Applicable", primary category "Lifestyle".
+
+### Remaining / next steps (tomorrow)
+- CONFIRM App Information -> Name is set to "Gurdwara Sahib Melaka". If the field was blank/locked
+  while Waiting for Review, may need Cancel Submission -> rename -> resubmit.
+- Watch review; address any App Review issues (make sure backend at gurdwarasahibmelaka.com is live so
+  events/gallery screens are not empty for the reviewer).
+- After approval: release (manual or auto per release option chosen).
+- Future releases: bump `pubspec.yaml` version/build, commit, push tag `vX.Y.Z` -> CI uploads automatically.
+- Optional cleanup (not started): remove duplicate run when a tag push also rebuilds on main push.
+- NOTE: There are pre-existing uncommitted local edits in `main.dart`, `AndroidManifest.xml`,
+  `.flutter-plugins-dependencies` that were NOT part of this iOS work - left untouched/uncommitted.
+
