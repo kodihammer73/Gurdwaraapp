@@ -1,0 +1,6 @@
+# Apple signing secrets / local-only credentials
+apple-certs/
+*.p12
+*.p8
+*.cer
+*.key

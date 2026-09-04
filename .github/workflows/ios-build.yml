@@ -1,12 +1,12 @@
-name: iOS Build
+name: iOS Build & Publish
 
 on:
   push:
     branches: [ main, develop ]
+    tags: [ 'v*' ]
     paths:
       - 'gurdwara_app/lib/**'
       - 'gurdwara_app/ios/**'
-      - 'gurdwara_app/android/**'
       - 'gurdwara_app/pubspec.yaml'
       - 'gurdwara_app/pubspec.lock'
       - '.github/workflows/ios-build.yml'
@@ -15,36 +15,35 @@ on:
     paths:
       - 'gurdwara_app/lib/**'
       - 'gurdwara_app/ios/**'
-      - 'gurdwara_app/android/**'
       - 'gurdwara_app/pubspec.yaml'
       - 'gurdwara_app/pubspec.lock'
       - '.github/workflows/ios-build.yml'
 
 
 jobs:
-  build-ios:
+  build-and-publish-ios:
     runs-on: macos-latest
-    
+
     defaults:
       run:
         working-directory: gurdwara_app
-    
+
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
+
     - name: Set up Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.44.8'
         channel: 'stable'
-    
+
     - name: Install dependencies
       run: flutter pub get
-    
+
     - name: Run tests
       run: flutter test
       continue-on-error: true
-    
+
     - name: Cache CocoaPods
       uses: actions/cache@v3
       with:
@@ -52,29 +51,46 @@ jobs:
         key: ${{ runner.os }}-pods-${{ hashFiles('gurdwara_app/ios/Podfile.lock') }}
         restore-keys: |
           ${{ runner.os }}-pods-
-    
+
     - name: Install CocoaPods
       run: |
         cd ios
         pod install
       shell: bash
-    
-    - name: Build iOS IPA
-      run: flutter build ios --release --no-codesign
-    
+
+    - name: Import signing certificate
+      env:
+        APPLE_DIST_P12: ${{ secrets.APPLE_DIST_P12 }}
+        APPLE_DIST_P12_PASSWORD: ${{ secrets.APPLE_DIST_P12_PASSWORD }}
+      run: |
+        CERT_PATH="$RUNNER_TEMP/build_certificate.p12"
+        KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+        echo "$APPLE_DIST_P12" | base64 --decode > "$CERT_PATH"
+        security create-keychain -p "" "$KEYCHAIN_PATH"
+        security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+        security unlock-keychain -p "" "$KEYCHAIN_PATH"
+        security import "$CERT_PATH" -P "$APPLE_DIST_P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+        security list-keychain -d user -s "$KEYCHAIN_PATH"
+        security set-key-partition-list -S apple-tool:,apple: -s -k "" "$KEYCHAIN_PATH"
+      shell: bash
+
+    - name: Build signed iOS app
+      run: flutter build ios --release
+
     - name: Create IPA
       run: |
         cd build/ios/iphoneos
+        rm -rf Payload
         mkdir -p Payload
         mv Runner.app Payload/
-        zip -r -y ${{ github.workspace }}/gurdwara_app.ipa Payload/
-    
+        zip -r -y "${{ github.workspace }}/gurdwara_app.ipa" Payload/
+
     - name: Upload IPA artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ios-ipa
+        name: ios-signed-ipa
         path: gurdwara_app.ipa
-    
+
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
@@ -82,3 +98,16 @@ jobs:
         files: gurdwara_app.ipa
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload to App Store Connect
+      if: startsWith(github.ref, 'refs/tags/')
+      env:
+        API_KEY: ${{ secrets.APPLE_API_KEY_ID }}
+        API_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
+        API_KEY_FILE: ${{ secrets.APPLE_API_KEY_FILE }}
+      run: |
+        mkdir -p "$HOME/private_keys"
+        echo "$API_KEY_FILE" | base64 --decode > "$HOME/private_keys/AuthKey_$API_KEY.p8"
+        xcrun altool --upload-app -f "${{ github.workspace }}/gurdwara_app.ipa" -t ios \
+          --apiKey "$API_KEY" --apiIssuer "$API_ISSUER" --verbose
+      shell: bash
