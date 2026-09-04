@@ -105,8 +105,8 @@ jobs:
         </dict>
         </plist>
         EOF
-        # Codesign the whole .app (deep signs the nested frameworks) with the Apple Distribution cert
-        /usr/bin/codesign --force --deep --sign "Apple Distribution" \
+        # Codesign the whole .app (deep signs the nested frameworks) with the iPhone Distribution cert
+        /usr/bin/codesign --force --deep --sign "iPhone Distribution" \
           --entitlements "$RUNNER_TEMP/entitlements.plist" Runner.app
         codesign -dv --verbose=4 Runner.app 2>&1 | sed -n '1,15p'
         # Package into an .ipa (Payload/Runner.app)
