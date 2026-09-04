@@ -74,6 +74,19 @@ jobs:
         security set-key-partition-list -S apple-tool:,apple: -s -k "" "$KEYCHAIN_PATH"
       shell: bash
 
+    - name: Install provisioning profile
+      env:
+        APPLE_DIST_PROFILE: ${{ secrets.APPLE_DIST_PROFILE }}
+      run: |
+        PROFILE_PATH="$RUNNER_TEMP/distribution.mobileprovision"
+        echo "$APPLE_DIST_PROFILE" | base64 --decode > "$PROFILE_PATH"
+        security cms -D -i "$PROFILE_PATH" > "$RUNNER_TEMP/distribution.plist"
+        UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/distribution.plist")
+        mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+        cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+        echo "Installed provisioning profile UUID: $UUID"
+      shell: bash
+
     - name: Build signed iOS app
       run: flutter build ios --release
 
