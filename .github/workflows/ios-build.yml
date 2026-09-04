@@ -93,24 +93,27 @@ jobs:
       run: flutter build ios --release --no-codesign
 
     - name: Sign app & create IPA
+      env:
+        APPLE_DIST_PROFILE: ${{ secrets.APPLE_DIST_PROFILE }}
       run: |
         set -euo pipefail
         cd build/ios/iphoneos
-        # Minimal entitlements: aps-environment enables push notifications in the store build
-        cat > "$RUNNER_TEMP/entitlements.plist" <<'EOF'
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>aps-environment</key>
-            <string>production</string>
-        </dict>
-        </plist>
-        EOF
-        # Codesign the whole .app (deep signs the nested frameworks) with the iPhone Distribution cert
-        /usr/bin/codesign --force --deep --sign "iPhone Distribution" \
-          --entitlements "$RUNNER_TEMP/entitlements.plist" Runner.app
-        codesign -dv --verbose=4 Runner.app 2>&1 | sed -n '1,15p'
+        APP="Runner.app"
+        # Restore the provisioning profile into the bundle (required by App Store Connect)
+        PROFILE_PATH="$RUNNER_TEMP/distribution.mobileprovision"
+        echo "$APPLE_DIST_PROFILE" | base64 --decode > "$PROFILE_PATH"
+        cp "$PROFILE_PATH" "$APP/embedded.mobileprovision"
+        # Extract the profile's entitlements (includes aps-environment)
+        security cms -D -i "$PROFILE_PATH" > "$RUNNER_TEMP/profile.plist"
+        /usr/libexec/PlistBuddy -x -c "Print :Entitlements" "$RUNNER_TEMP/profile.plist" > "$RUNNER_TEMP/entitlements.plist"
+        # Sign nested frameworks first (no app-level entitlements)
+        while IFS= read -r -d '' fw; do
+          /usr/bin/codesign --force --sign "iPhone Distribution" "$fw"
+        done < <(find "$APP" -name '*.framework' -type d -prune -print0)
+        # Sign the app bundle; applies entitlements to the main executable
+        /usr/bin/codesign --force --sign "iPhone Distribution" \
+          --entitlements "$RUNNER_TEMP/entitlements.plist" "$APP"
+        codesign -dv --verbose=4 "$APP" 2>&1 | sed -n '1,15p'
         # Package into an .ipa (Payload/Runner.app)
         rm -rf Payload
         mkdir -p Payload
