@@ -127,14 +127,11 @@ jobs:
     - name: Upload to App Store Connect
       if: startsWith(github.ref, 'refs/tags/')
       env:
-        API_KEY: ${{ secrets.APPLE_API_KEY_ID }}
-        API_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
-        API_KEY_FILE: ${{ secrets.APPLE_API_KEY_FILE }}
+        APPLE_ID: ${{ secrets.APPLE_ID }}
+        APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
       run: |
-        mkdir -p "$HOME/private_keys"
-        echo "$API_KEY_FILE" | base64 --decode > "$HOME/private_keys/AuthKey_$API_KEY.p8"
         xcrun altool --upload-app -f "${{ github.workspace }}/gurdwara_app.ipa" -t ios \
-          --apiKey "$API_KEY" --apiIssuer "$API_ISSUER" --verbose
+          -u "$APPLE_ID" -p "$APPLE_APP_SPECIFIC_PASSWORD" --verbose
       shell: bash
 
     - name: Create Release
