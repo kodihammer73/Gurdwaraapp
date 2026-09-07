@@ -677,3 +677,34 @@ Enable building a **signed** iOS .ipa via GitHub Actions and auto-upload to App 
 - NOTE: There are pre-existing uncommitted local edits in `main.dart`, `AndroidManifest.xml`,
   `.flutter-plugins-dependencies` that were NOT part of this iOS work - left untouched/uncommitted.
 
+---
+
+## 🔴 TOP PRIORITY — PENDING (2026-09-07)
+
+### Make force-update / minimum-version check platform-aware for BOTH Android & iOS
+
+**Status:** ⛔ PENDING — highest priority. Blocked on the user providing the Apple App Store URL.
+
+**Problem:** The version check runs on both Android & iOS, but uses ONE shared config and is not
+platform-aware:
+- `website/app_version.json` holds a single `minimum_version` (`1.0.6`), `force_update` (`true`),
+  and a **Play Store-only** `play_store_url`.
+- `lib/services/version_check_service.dart` compares installed vs that one `minimum_version` and
+  hands a single `play_store_url` to the dialog.
+- Consequence: iOS users who get force-updated would be sent to the (wrong) Google Play link; there is
+  no per-OS minimum version and no App Store URL.
+
+**Planned changes (when unblocked):**
+1. Make `website/app_version.json` platform-aware (e.g. `android.minimum_version` +
+   `android.play_store_url`, and `ios.minimum_version` + `ios.app_store_url`).
+2. Update `VersionCheckService.checkForUpdate()` to select the correct minimum version + store URL via
+   `Platform.isAndroid` / `Platform.isIOS` (installed version already read generically via
+   `package_info_plus`).
+3. Point the force-update dialog's "Update Now" at the correct store per OS.
+4. Update + deploy `website/app_version.json` to `https://www.gurdwarasahibmelaka.com/app_version.json`.
+5. (Cleanup) delete the stale, unused `app/gurdwara_app/version.json` (old `min_version` 1.0.2 /
+   wrong app id `com.gsmelaka.app`) — NOT read by the service.
+
+**Blocker / input needed from user:** the **Apple App Store URL** for this app
+(bundle id `com.gsmelaka.mobileapp`) — to be pasted once the App Store submission is approved.
+
