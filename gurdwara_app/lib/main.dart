@@ -784,6 +784,27 @@ class _QuickActionsRow extends StatelessWidget {
     }
   }
 
+  Future<void> _launchWhatsApp(BuildContext context) async {
+    final phone = Uri.encodeQueryComponent(_digitsOnly);
+    final whatsappUri = Uri.parse('whatsapp://send?phone=$phone');
+    final openedWhatsApp = await launchUrl(
+      whatsappUri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (openedWhatsApp || !context.mounted) return;
+
+    final fallbackUri = Uri.parse('https://wa.me/$_digitsOnly');
+    final openedFallback = await launchUrl(
+      fallbackUri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!openedFallback && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open WhatsApp')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final actions = [
@@ -797,7 +818,7 @@ class _QuickActionsRow extends StatelessWidget {
         icon: Icons.chat_rounded,
         label: LocalizationService.instance.t('whatsapp'),
         color: const Color(0xFF25D366),
-        onTap: () => _launch(context, 'https://wa.me/$_digitsOnly'),
+        onTap: () => _launchWhatsApp(context),
       ),
     ];
 
@@ -1639,7 +1660,10 @@ class _HomepageEventTile extends StatelessWidget {
                 ),
               ),
             ],
-            if (isToday && isNowLive(event, DateTime.now())) ...[
+            if (isToday &&
+                (event.isAkhandPath
+                    ? isAkhandDayLive(event, DateTime.now())
+                    : isNowLive(event, DateTime.now()))) ...[
               const SizedBox(height: 4),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -3689,6 +3713,7 @@ class _AboutScreenState extends State<AboutScreen> {
     List<CommitteeMember> committee = [];
     String contactNumber = '';
     String contactPerson = '';
+    String contactEmail = '';
     String address = '';
     String mapUrl = '';
 
@@ -3743,6 +3768,7 @@ class _AboutScreenState extends State<AboutScreen> {
       if (aboutPage != null) {
         contactNumber = (aboutPage['contactPhone'] as String? ?? '').trim();
         contactPerson = (aboutPage['person'] as String? ?? '').trim();
+        contactEmail = (aboutPage['email'] as String? ?? '').trim();
       }
 
       if (contactNumber.isEmpty || contactPerson.isEmpty) {
@@ -3750,6 +3776,12 @@ class _AboutScreenState extends State<AboutScreen> {
         if (footerContact != null) {
           contactNumber = (footerContact['phone'] as String? ?? contactNumber).trim();
           contactPerson = (footerContact['person'] as String? ?? contactPerson).trim();
+        }
+      }
+      if (contactEmail.isEmpty) {
+        final footerContact = contactJson['footerContact'] as Map<String, dynamic>?;
+        if (footerContact != null) {
+          contactEmail = (footerContact['email'] as String? ?? contactEmail).trim();
         }
       }
     } catch (e) {
@@ -3776,6 +3808,7 @@ class _AboutScreenState extends State<AboutScreen> {
       contactPerson: contactPerson,
       mapUrl: mapUrl,
       contactNumber: contactNumber,
+      contactEmail: contactEmail,
     );
   }
 
@@ -3975,7 +4008,7 @@ class _AboutScreenState extends State<AboutScreen> {
               ),
             if (data.committee.isNotEmpty) const SizedBox(height: 16),
 
-            if (data.address.isNotEmpty || data.contactPerson.isNotEmpty || data.contactNumber.isNotEmpty)
+            if (data.address.isNotEmpty || data.contactPerson.isNotEmpty || data.contactNumber.isNotEmpty || data.contactEmail.isNotEmpty)
               SizedBox(
                 width: double.infinity,
                 child: _ImmersiveInfoCard(
@@ -4074,11 +4107,38 @@ class _AboutScreenState extends State<AboutScreen> {
                             ),
                           ],
                         ),
+                      if (data.contactEmail.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Contact Email:',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                data.contactEmail,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
               ),
-            if (data.address.isNotEmpty || data.contactPerson.isNotEmpty || data.contactNumber.isNotEmpty)
+            if (data.address.isNotEmpty || data.contactPerson.isNotEmpty || data.contactNumber.isNotEmpty || data.contactEmail.isNotEmpty)
               const SizedBox(height: 16),
 
             if (data.mapUrl.isNotEmpty)
@@ -4230,6 +4290,7 @@ class AboutData {
     required this.contactPerson,
     required this.mapUrl,
     required this.contactNumber,
+    required this.contactEmail,
   });
 
   final List<CommitteeMember> committee;
@@ -4237,6 +4298,7 @@ class AboutData {
   final String contactPerson;
   final String mapUrl;
   final String contactNumber;
+  final String contactEmail;
 
   factory AboutData.fromJson(Map<String, dynamic> json) {
     final committee = <CommitteeMember>[];
@@ -4254,6 +4316,7 @@ class AboutData {
       contactPerson: json['contact_person'] as String? ?? '',
       mapUrl: json['map_url'] as String? ?? '',
       contactNumber: json['contact_number'] as String? ?? json['phone'] as String? ?? '',
+      contactEmail: json['email'] as String? ?? '',
     );
   }
 }
