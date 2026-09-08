@@ -37,17 +37,20 @@ class NotificationService {
   Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
 
-    // ⭐ FIX: Initialize without settings (new API)
-    await _localNotifications.initialize(
-      const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        iOS: DarwinInitializationSettings(
-          requestAlertPermission: true,
-          requestBadgePermission: true,
-          requestSoundPermission: true,
+    try {
+      await _localNotifications.initialize(
+        const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          iOS: DarwinInitializationSettings(
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      print('⚠️ localNotifications.initialize threw: $e');
+    }
 
     // Diagnostics are sent FIRST (before any Firebase calls that could throw)
     // so we always capture the on-device state even if permission/token calls fail.
@@ -97,20 +100,24 @@ class NotificationService {
       _handleNotificationTap(message);
     });
 
-    await Workmanager().initialize(
-      callbackDispatcher,
-      isInDebugMode: false,
-    );
+    try {
+      await Workmanager().initialize(
+        callbackDispatcher,
+        isInDebugMode: false,
+      );
 
-    await Workmanager().registerPeriodicTask(
-      'event_notification_check',
-      _workManagerTask,
-      frequency: const Duration(hours: 12),
-      initialDelay: const Duration(hours: 1),
-      constraints: Constraints(
-        networkType: NetworkType.connected,
-      ),
-    );
+      await Workmanager().registerPeriodicTask(
+        'event_notification_check',
+        _workManagerTask,
+        frequency: const Duration(hours: 12),
+        initialDelay: const Duration(hours: 1),
+        constraints: Constraints(
+          networkType: NetworkType.connected,
+        ),
+      );
+    } catch (e) {
+      print('⚠️ Workmanager init failed: $e');
+    }
   }
 
   @pragma('vm:entry-point')
