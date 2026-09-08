@@ -708,3 +708,74 @@ platform-aware:
 **Blocker / input needed from user:** the **Apple App Store URL** for this app
 (bundle id `com.gsmelaka.mobileapp`) — to be pasted once the App Store submission is approved.
 
+## Session 21: iOS Push Notification Entitlement Fix + Release Prep (2026-09-08)
+
+### Context
+The iOS app (v1.0.7, build 8) was submitted to the App Store and "Waiting for Review", but remote push
+(FCM) was not actually enabled on iOS. Investigation found the issue was on the Apple/Firebase side —
+the code already requests permission and registers on iOS (`NotificationService.initialize()` runs
+unconditionally in `main.dart`; `Info.plist` has `remote-notification` in `UIBackgroundModes`).
+
+### Root Cause
+The distribution provisioning profile used to sign the build did **not** contain the `aps-environment`
+entitlement. Inspecting `apple-certs/Gurdwara_Sahib_Melaka.mobileprovision` showed its embedded
+`Entitlements` only had `beta-reports-active`, `application-identifier`, `keychain-access-groups`,
+`get-task-allow=false`, and team-identifier — **no `aps-environment`**. The iOS build pipeline signs by
+extracting entitlements from the provisioning profile (`.github/workflows/ios-build.yml`), so the
+uploaded binary carried no push entitlement → iOS remote push would fail / risk App Review rejection
+("Missing Push Notification Entitlement"). Note: `flutter_local_notifications` (local reminders) do NOT
+need APNs, which is why only FCM remote push was affected.
+
+### Changes Applied (external config — no repo code change needed for the entitlement)
+1. **Apple Developer portal** → App ID `com.gsmelaka.mobileapp`: enabled the **Push Notifications**
+   capability (only "Push Notifications"; the "Push Notifications Broadcast" capability is NOT needed).
+   The "Configure" APNs SSL-certificate step was **skipped** — the project uses an **APNs Authentication
+   Key** (`.p8`) for FCM, not the two SSL certs.
+2. **Regenerated** the distribution provisioning profile → now confirmed to contain
+   `aps-environment = production`. New profile saved to `apple-certs/Gurdwara_Sahib_Melaka.mobileprovision`.
+3. **GitHub secret `APPLE_DIST_PROFILE`** updated to the base64 of the new push-enabled profile
+   (critical — CI signs with the secret, NOT the local `apple-certs` file).
+4. **Firebase Console** (project `gsmelaka1925`) → iOS app `com.gsmelaka.mobileapp` → Cloud Messaging:
+   uploaded the APNs **Authentication Key** into the **Production** slot using `apple-certs/ApiKey_6UEIK02NE5F1.p8`
+   (Key ID `6UEIK02NE5F1`, Team ID `536335249D`). Development slot left empty (not needed for App Store/TestFlight).
+
+### Release Builds Prepared (version 1.0.8, build/versionCode 9)
+- **`pubspec.yaml`**: `version: 1.0.7+8` → `version: 1.0.8+9` (committed locally; to be pushed with tag `v1.0.8`
+  to trigger the iOS publish workflow → uploads new push-enabled IPA to App Store Connect).
+- **Android AAB built locally** for Google Play:
+  `D:\GSM\app\gurdwara_app-1.0.8_release.aab` (57.4 MB, versionCode 9, signed with the `upload` release key).
+
+### Status / Pending
+- ⏳ **iOS push NOT yet end-to-end tested** — the previous build (1.0.7) is still "Waiting for Review" in
+  App Store Connect. Plan: **Remove from Review** that old build, submit the new 1.0.8+9 build (needs the
+  `v1.0.8` tag pushed + workflow green), install via TestFlight, then confirm a push from the website admin
+  panel / Firebase arrives before final App Store submission.
+- ⏳ Play Store: upload `gurdwara_app-1.0.8_release.aab` as a new release (versionCode 9) in Google Play Console.
+- ⏳ iOS App Store URL still needed to finalize Session 20 (force-update store link).
+- ⚠️ Non-blocking: upgrade Android AGP 8.11.1 → 9.x and Kotlin 2.2.20 → 2.3.x soon (Flutter warns support
+  will be dropped). Do NOT commit `gurdwara_app-1.0.8_release.aab` (untracked build artifact at repo root).
+
+## Session 21b (2026-09-08) — iOS push: device never registered (fix + diagnostics)
+
+### Why iOS got nothing
+`website/data/devices.db` showed **0 iOS tokens** (all 89 are Android `:APA91b…`), even though the
+iPhone runs the push-enabled 1.0.8+9 build. Root cause: iOS APNs token wasn't ready at the single
+cold-launch `FirebaseMessaging.getToken()` call, so no registration ever happened
+(`onTokenRefresh` alone is unreliable if the app closes first).
+
+### Code changes
+- `lib/services/notification_service.dart`:
+  - `_getTokenWithRetry()` — polls for the token up to 8× @1.5s (~12s).
+  - `_registerDeviceToken()` now sends real `platform` (`Platform.isIOS`→`ios`) and real
+    `app_version` via `package_info_plus` (was hardcoded `android`/`1.0.0`).
+  - Logs real HTTP status/body + errors on registration failure.
+- Matched backend (`api/send_push.php`, `website/admin.php`) return a per-platform breakdown and
+  warn in the admin summary when 0 iOS devices are registered.
+
+### Next
+- ✅ Bumped `pubspec.yaml` to **1.0.9+10**, committed push-fix + memory-bank, pushed `main`, then tag
+  **`v1.0.9`** → CI rebuilds the signed IPA (with `aps-environment`) and uploads it to App Store Connect.
+- Reinstall on iPhone via TestFlight, open app ~15s, confirm `platform='ios'` row appears, resend.
+- If iOS still never registers after reinstall: verify the **CI `APPLE_DIST_PROFILE` secret** actually
+  contains `aps-environment=production` by decoding the embedded provisioning profile in the built IPA.
+

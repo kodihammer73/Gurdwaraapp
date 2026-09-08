@@ -1,5 +1,6 @@
 // lib/services/notification_service.dart
 
+import 'dart:io' show Platform;
 import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -9,6 +10,7 @@ import 'package:workmanager/workmanager.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../main.dart' as app;
 
 class NotificationService {
@@ -52,13 +54,22 @@ class NotificationService {
       sound: true,
     );
 
-    await FirebaseMessaging.instance.getToken().then((token) {
-      if (token != null) {
-        print('FCM Token: $token');
-        _prefs.setString('fcm_token', token);
-        _registerDeviceToken(token);
-      }
-    });
+    // Fetch the FCM/APNs token. On iOS, the APNs token often isn't ready
+    // immediately at cold launch, so retry for a while before giving up.
+    // This closes the gap where a device never registers because the token
+    // was null on the first attempt and the app was closed before the
+    // asynchronous refresh fired.
+    final String? token = await _getTokenWithRetry(
+      maxAttempts: 8,
+      delay: const Duration(milliseconds: 1500),
+    );
+    if (token != null) {
+      print('FCM Token: $token');
+      _prefs.setString('fcm_token', token);
+      await _registerDeviceToken(token);
+    } else {
+      print('⚠️ FCM/APNs token unavailable after retries (iOS may still deliver later via refresh)');
+    }
 
     // Listen for token refresh
     FirebaseMessaging.instance.onTokenRefresh.listen((token) {
@@ -267,15 +278,17 @@ class NotificationService {
   }
 
 
-  /// Register this device's FCM token with the backend server
+  /// Register this device's FCM token with the backend server.
   Future<void> _registerDeviceToken(String token) async {
+    final String platform = _getPlatform();
+    final String appVersion = await _getAppVersion();
     try {
-      await _dio.post(
+      final response = await _dio.post(
         _registerDeviceUrl,
         data: {
           'token': token,
-          'platform': 'android',
-          'app_version': '1.0.0',
+          'platform': platform,
+          'app_version': appVersion,
         },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
@@ -283,10 +296,60 @@ class NotificationService {
           receiveTimeout: const Duration(seconds: 10),
         ),
       );
-      print('✅ Device token registered with backend');
+      print('✅ Device token registered with backend'
+          ' (platform=$platform, appVersion=$appVersion)');
+      print('   HTTP ${response.statusCode}: ${response.data}');
     } catch (e) {
-      print('⚠️ Failed to register device token (server may not be set up yet): $e');
+      // Expose the real error so iOS registration failures are visible
+      // in the run log instead of being silently swallowed.
+      print('⚠️ Failed to register device token '
+          '(platform=$platform, appVersion=$appVersion): $e');
     }
+  }
+
+  /// Best-effort platform label reported to the backend so Admin can tell
+  /// iOS from Android. Falls back to a generic value if detection is unsure.
+  String _getPlatform() {
+    if (Platform.isAndroid) return 'android';
+    if (Platform.isIOS) return 'ios';
+    if (Platform.isMacOS) return 'macos';
+    if (Platform.isWindows) return 'windows';
+    if (Platform.isLinux) return 'linux';
+    return 'unknown';
+  }
+
+  /// Reads the installed app version (from pubspec.yaml at build time) so the
+  /// backend stores the real version instead of a hardcoded "1.0.0".
+  Future<String> _getAppVersion() async {
+    try {
+      final pkg = await PackageInfo.fromPlatform();
+      if (pkg.version.isNotEmpty) {
+        return pkg.version;
+      }
+    } catch (e) {
+      print('⚠️ Could not read app version, defaulting to 1.0.0: $e');
+    }
+    return '1.0.0';
+  }
+
+  /// Attempts to fetch the FCM/APNs token up to [maxAttempts] times, waiting
+  /// [delay] between attempts. iOS often needs a moment before the APNs token
+  /// is available, so retrying here avoids permanently missing registration.
+  Future<String?> _getTokenWithRetry({
+    required int maxAttempts,
+    required Duration delay,
+  }) async {
+    for (int i = 0; i < maxAttempts; i++) {
+      if (i > 0) {
+        await Future.delayed(delay);
+      }
+      final String? token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        print('FCM/APNs token obtained on attempt ${i + 1}');
+        return token;
+      }
+    }
+    return null;
   }
 
   Future<void> manualCheckAndNotify() async {
