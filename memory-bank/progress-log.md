@@ -779,3 +779,28 @@ cold-launch `FirebaseMessaging.getToken()` call, so no registration ever happene
 - If iOS still never registers after reinstall: verify the **CI `APPLE_DIST_PROFILE` secret** actually
   contains `aps-environment=production` by decoding the embedded provisioning profile in the built IPA.
 
+## Session 21c (2026-09-08) — On-device Firebase Messaging diagnostics
+
+Still no iOS registration after v1.0.9 (installed + opened on iPhone). The `codesign -dv` output in CI
+was truncated to 15 lines, so the `aps-environment` entitlement could not be confirmed from the run.
+
+To stop guessing, added an **on-device diagnostic beacon**:
+- `lib/services/notification_service.dart`:
+  - `_reportDiagnostics()` posts `isSupported`, `getAPNSToken()` (masked), `getToken()` (masked),
+    `getNotificationSettings().authorizationStatus`, real `platform` + `app_version` to a new endpoint.
+  - Called once after the token retry loop during `initialize()`.
+  - `_maskToken()` truncates tokens to 16 chars so no full credentials are logged.
+- `website/api/ios_diag.php` (NEW): stores reports in `website/data/ios_diag.json` (cap 200).
+- `website/admin.php`: Push Notification tab now renders a **Firebase Messaging Device Diagnostics**
+  table (time, platform, app, supported, APNs token, FCM token, permission status).
+- Bumped to **1.0.10+11** for TestFlight reinstall.
+
+### How to read the diagnostics (next install)
+On the admin Push Notification tab after opening the new build on the iPhone:
+- `Supported = ❌` → iOS Firebase Messaging plugin unavailable in the binary (likely missing
+  `aps-environment` entitlement → fix `APPLE_DIST_PROFILE` secret).
+- `Supported = ✅` but `FCM token = (none)` → Firebase APNs key not configured for `com.gsmelaka.mobileapp`
+  in the `gsmelaka1925` console (Production slot).
+- `FCM token` present but still no push → token is fine; check the console APNs Production key or delivery.
+- `Permission` shows `denied` → user blocked notifications in iOS settings.
+

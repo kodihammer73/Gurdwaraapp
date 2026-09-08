@@ -21,6 +21,7 @@ class NotificationService {
   static const String _siteBaseUrl = 'https://www.gurdwarasahibmelaka.com';
   static const String _eventsUrl = '$_siteBaseUrl/events.txt';
   static const String _registerDeviceUrl = '$_siteBaseUrl/api/register_device.php';
+  static const String _diagnosticsUrl = '$_siteBaseUrl/api/ios_diag.php';
   static const String _workManagerTask = 'event_notification_task';
 
   /// Callback invoked when a notification is tapped while the app is open.
@@ -70,6 +71,10 @@ class NotificationService {
     } else {
       print('⚠️ FCM/APNs token unavailable after retries (iOS may still deliver later via refresh)');
     }
+
+    // Report on-device Firebase Messaging state so the backend (admin panel)
+    // can show exactly why an iOS device fails to register a token.
+    await _reportDiagnostics();
 
     // Listen for token refresh
     FirebaseMessaging.instance.onTokenRefresh.listen((token) {
@@ -305,6 +310,70 @@ class NotificationService {
       print('⚠️ Failed to register device token '
           '(platform=$platform, appVersion=$appVersion): $e');
     }
+  }
+
+  /// Gathers the on-device Firebase Messaging state and posts it to the backend
+  /// so the admin panel can show exactly why a device could not obtain a token.
+  /// This is especially important on iOS, where a missing APNs entitlement or
+  /// unconfigured Firebase APNs key silently prevents token acquisition.
+  Future<void> _reportDiagnostics() async {
+    try {
+      bool supported = false;
+      String? apnsToken;
+      String? fcmToken;
+      String authStatus = 'notDetermined';
+
+      try {
+        supported = await FirebaseMessaging.instance.isSupported();
+      } catch (e) {
+        print('⚠️ diag isSupported: $e');
+      }
+      try {
+        apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+      } catch (e) {
+        print('⚠️ diag getAPNSToken: $e');
+      }
+      try {
+        fcmToken = await FirebaseMessaging.instance.getToken();
+      } catch (e) {
+        print('⚠️ diag getToken: $e');
+      }
+      try {
+        final settings = await FirebaseMessaging.instance.getNotificationSettings();
+        authStatus = settings.authorizationStatus.name;
+      } catch (e) {
+        print('⚠️ diag getNotificationSettings: $e');
+      }
+
+      final payload = <String, dynamic>{
+        'platform': _getPlatform(),
+        'app_version': await _getAppVersion(),
+        'is_supported': supported,
+        'apns_token': _maskToken(apnsToken),
+        'fcm_token': _maskToken(fcmToken),
+        'auth_status': authStatus,
+      };
+
+      final resp = await _dio.post(
+        _diagnosticsUrl,
+        data: payload,
+        options: Options(
+          contentType: Headers.formUrlEncodedContentType,
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+        ),
+      );
+      print('📡 Firebase Messaging diagnostics reported: HTTP ${resp.statusCode} ${resp.data}');
+    } catch (e) {
+      print('⚠️ Could not report Firebase Messaging diagnostics: $e');
+    }
+  }
+
+  /// Returns the first 16 chars of a token (or ''), to avoid logging full
+  /// credentials while still confirming a token exists.
+  String _maskToken(String? token) {
+    if (token == null || token.isEmpty) return '';
+    return token.length <= 16 ? token : token.substring(0, 16);
   }
 
   /// Best-effort platform label reported to the backend so Admin can tell
