@@ -49,11 +49,19 @@ class NotificationService {
       ),
     );
 
-    await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    // Diagnostics are sent FIRST (before any Firebase calls that could throw)
+    // so we always capture the on-device state even if permission/token calls fail.
+    await _reportDiagnostics();
+
+    try {
+      await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    } catch (e) {
+      print('⚠️ requestPermission threw: $e');
+    }
 
     // Fetch the FCM/APNs token. On iOS, the APNs token often isn't ready
     // immediately at cold launch, so retry for a while before giving up.
@@ -71,10 +79,6 @@ class NotificationService {
     } else {
       print('⚠️ FCM/APNs token unavailable after retries (iOS may still deliver later via refresh)');
     }
-
-    // Report on-device Firebase Messaging state so the backend (admin panel)
-    // can show exactly why an iOS device fails to register a token.
-    await _reportDiagnostics();
 
     // Listen for token refresh
     FirebaseMessaging.instance.onTokenRefresh.listen((token) {
@@ -404,6 +408,9 @@ class NotificationService {
   /// Attempts to fetch the FCM/APNs token up to [maxAttempts] times, waiting
   /// [delay] between attempts. iOS often needs a moment before the APNs token
   /// is available, so retrying here avoids permanently missing registration.
+  /// Never throws: a failed `getToken()` is treated as "not ready yet" and
+  /// retried, so an iOS plugin exception cannot abort the startup flow before
+  /// diagnostics/registration run.
   Future<String?> _getTokenWithRetry({
     required int maxAttempts,
     required Duration delay,
@@ -412,10 +419,14 @@ class NotificationService {
       if (i > 0) {
         await Future.delayed(delay);
       }
-      final String? token = await FirebaseMessaging.instance.getToken();
-      if (token != null) {
-        print('FCM/APNs token obtained on attempt ${i + 1}');
-        return token;
+      try {
+        final String? token = await FirebaseMessaging.instance.getToken();
+        if (token != null) {
+          print('FCM/APNs token obtained on attempt ${i + 1}');
+          return token;
+        }
+      } catch (e) {
+        print('⚠️ getToken() threw on attempt ${i + 1}: $e');
       }
     }
     return null;
