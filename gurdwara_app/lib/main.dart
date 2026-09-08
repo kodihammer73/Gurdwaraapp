@@ -47,28 +47,24 @@ final Dio _dio = Dio(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Android: google-services.json auto-initializes Firebase
-  // iOS/others: need explicit initialization
+  // Clean initialization check using Firebase.apps (never throws StateError)
   try {
-    Firebase.app();
-  } on Exception {
-
-    try {
+    if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
       print('✅ Firebase initialized via options');
-    } on Exception catch (e) {
-      print('⚠️ Firebase init skipped: $e');
     }
+  } catch (e, stack) {
+    print('⚠️ Firebase init failed: $e\n$stack');
   }
 
   try {
     final notificationService = NotificationService();
     await notificationService.initialize();
     print('✅ Notification Service initialized');
-  } catch (e) {
-    print('⚠️ Notification Service init failed: $e');
+  } catch (e, stack) {
+    print('⚠️ Notification Service init failed: $e\n$stack');
   }
   
   runApp(const ProviderScope(child: GurdwaraApp()));
