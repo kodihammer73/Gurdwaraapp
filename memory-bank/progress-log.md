@@ -10,6 +10,13 @@
 - **Release procedure**: 1) bump `version:` in `gurdwara_app/pubspec.yaml` (e.g. `1.0.16+17`), 2) commit + push to `main`, 3) `git tag vX.Y.Z && git push origin vX.Y.Z` to trigger App Store Connect upload, 4) build appears in App Store Connect → TestFlight, 5) submit for review in App Store Connect (new version entry — rejected versions are not resubmitted).
 - Flutter analyze baseline: only pre-existing infos (avoid_print, deprecated 'value'); treat new **errors** as failures.
 
+## Session: ITMS-90683 fix + FCM on-screen status (2026-09-09, later)
+
+- [x] **ITMS-90683 fixed**: added `NSCalendarsUsageDescription`, `NSCalendarsFullAccessUsageDescription`, `NSCalendarsWriteOnlyAccessUsageDescription` to `ios/Runner/Info.plist` (required by `add_2_calendar` plugin's EventKit references). Message: saving Gurdwara events/seva dates to calendar.
+- [x] **On-screen FCM status banner**: `NotificationService.registrationStatus` (static ValueNotifier) updated at each registration step; `_FcmStatusBanner` in `main.dart` (MaterialApp `builder` Stack overlay) shows top banner at launch: orange spinner while registering, green auto-hide on success, red with the failure reason on error. Tap to dismiss.
+- Version bumped to **1.0.16+18** (build 17 was rejected by ITMS-90683 so the number must increment); tag `v1.0.16-2` pushed to trigger ASC upload.
+- Note: build 17 upload failed with ITMS-90683 — the tag-triggered workflow did run; the new build 18 must go through before resubmitting for review.
+
 ## Session: Apple 4.2.2 Hardening — "Track My Request" (2026-09-09)
 
 ### Completed
