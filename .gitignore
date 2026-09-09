@@ -4,3 +4,5 @@ apple-certs/
 *.p8
 *.cer
 *.key
+
+*.aab
