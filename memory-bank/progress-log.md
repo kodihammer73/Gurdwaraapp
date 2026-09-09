@@ -1,5 +1,15 @@
 # Gurdwara Mobile App - Progress Log
 
+## CI/CD & Release Process (IMPORTANT - reference for future releases)
+
+- **Git repo root is `d:\GSM\app`** (NOT `d:\GSM\app\gurdwara_app`). The `gurdwara_app/` folder is a subfolder of the repo. Always run git commands from `d:\GSM\app`.
+- **GitHub Actions workflow is maintained at `.github/workflows/ios-build.yml` (repo root = `d:\GSM\app\.github\workflows\ios-build.yml`)** — "iOS Build & Publish". This is the ONLY iOS workflow; do not create duplicates in `gurdwara_app/.github/workflows/`.
+  - Secrets already configured (do NOT ask to add new ones): `APPLE_DIST_P12`, `APPLE_DIST_P12_PASSWORD`, `APPLE_DIST_PROFILE` (distribution provisioning profile), `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`.
+  - **On push to `main`/`develop`** (paths `gurdwara_app/lib|ios|pubspec*` changed): builds + signs the IPA (manual codesign, team 536335249D, bundle `com.gsmelaka.mobileapp`), uploads it as artifact `ios-signed-ipa`. No ASC upload.
+  - **On push of a tag `v*` (e.g. `v1.0.16`)**: additionally uploads the IPA to App Store Connect via `xcrun altool` using APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD, and creates a GitHub release with the IPA.
+- **Release procedure**: 1) bump `version:` in `gurdwara_app/pubspec.yaml` (e.g. `1.0.16+17`), 2) commit + push to `main`, 3) `git tag vX.Y.Z && git push origin vX.Y.Z` to trigger App Store Connect upload, 4) build appears in App Store Connect → TestFlight, 5) submit for review in App Store Connect (new version entry — rejected versions are not resubmitted).
+- Flutter analyze baseline: only pre-existing infos (avoid_print, deprecated 'value'); treat new **errors** as failures.
+
 ## Session: Apple 4.2.2 Hardening — "Track My Request" (2026-09-09)
 
 ### Completed
