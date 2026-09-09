@@ -4,6 +4,9 @@ import 'dart:convert';
 import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
+import 'package:add_2_calendar/add_2_calendar.dart';
+import 'package:gurdwara_app/widgets/seva_booking_screen.dart';
+import 'package:gurdwara_app/widgets/prayer_reader_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -250,14 +253,18 @@ class _HomeScreenState extends State<HomeScreen> {
       case 0:
         return HomeScreenContent(
           onCalendarSelected: () => _selectTab(1),
-          onGallerySelected: () => _selectTab(2),
+          onBookingSelected: () => _selectTab(2),
+          onGallerySelected: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => GalleryScreen()),
+          ),
           onAboutSelected: () => _selectTab(3),
           onSettingsSelected: () => _selectTab(4),
         );
       case 1:
         return const CalendarScreen();
       case 2:
-        return GalleryScreen();
+        return const SevaBookingScreen();
       case 3:
         return const AboutScreen();
       case 4:
@@ -267,7 +274,11 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         return HomeScreenContent(
           onCalendarSelected: () => _selectTab(1),
-          onGallerySelected: () => _selectTab(2),
+          onBookingSelected: () => _selectTab(2),
+          onGallerySelected: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => GalleryScreen()),
+          ),
           onAboutSelected: () => _selectTab(3),
           onSettingsSelected: () => _selectTab(4),
         );
@@ -313,9 +324,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Calendar',
           ),
           NavigationDestination(
-            icon: Icon(Icons.collections_outlined),
-            selectedIcon: Icon(Icons.collections),
-            label: 'Gallery',
+            icon: Icon(Icons.volunteer_activism_outlined),
+            selectedIcon: Icon(Icons.volunteer_activism),
+            label: 'Bookings',
           ),
           NavigationDestination(
             icon: Icon(Icons.info_outline),
@@ -337,12 +348,14 @@ class HomeScreenContent extends StatefulWidget {
   const HomeScreenContent({
     super.key,
     required this.onCalendarSelected,
+    required this.onBookingSelected,
     required this.onGallerySelected,
     required this.onAboutSelected,
     this.onSettingsSelected,
   });
 
   final VoidCallback onCalendarSelected;
+  final VoidCallback onBookingSelected;
   final VoidCallback onGallerySelected;
   final VoidCallback onAboutSelected;
   final VoidCallback? onSettingsSelected;
@@ -644,6 +657,53 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               _QuickActionsRow(phoneNumber: _contactNumber),
             const SizedBox(height: 12),
 
+            // Nitnem & Prayer Reader quick launcher card
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              color: const Color(0xFFE8A838),
+              child: ListTile(
+                leading: const Icon(Icons.menu_book, color: Colors.white, size: 30),
+                title: const Text(
+                  'Nitnem & Prayer Reader',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                subtitle: const Text(
+                  'Read Daily Nitnem with Gurmukhi & English Translation',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PrayerReaderScreen()),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // "Track My Request" banner — surfaces the request-tracking feature
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              color: const Color(0xFF1B365D),
+              child: ListTile(
+                leading: const Icon(Icons.manage_search_rounded, color: Color(0xFFE8A838), size: 30),
+                title: const Text(
+                  'Track My Request',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                subtitle: const Text(
+                  'Check the live status of your Langar, Hall Booking or Ardas request',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios, color: Color(0xFFE8A838), size: 16),
+                onTap: widget.onBookingSelected,
+              ),
+            ),
+            const SizedBox(height: 12),
+
             // "Last updated" hint (shown after a pull-to-refresh)
             if (_lastUpdated != null)
               Padding(
@@ -736,6 +796,16 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                     Color(0xFFFEE140), // Yellow
                   ],
                   onTap: widget.onAboutSelected,
+                ),
+                ImmersiveCategory(
+                  title: 'Booking',
+                  subtitle: 'Seva, Hall Booking & Tracking',
+                  icon: Icons.volunteer_activism_rounded,
+                  gradientColors: const [
+                    Color(0xFFFF9A9E), // Warm Peach
+                    Color(0xFFFECFEF), // Soft Rose
+                  ],
+                  onTap: widget.onBookingSelected,
                 ),
                 ImmersiveCategory(
                   title: 'Settings',
@@ -1687,6 +1757,30 @@ class _HomepageEventTile extends StatelessWidget {
                 ],
               ),
             ],
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: palette.foreground,
+                ),
+                icon: const Icon(Icons.calendar_today, size: 13),
+                label: const Text('Add to Calendar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                onPressed: () {
+                  final calendarEvent = Event(
+                    title: event.title,
+                    description: event.details,
+                    location: 'Gurdwara Sahib Melaka',
+                    startDate: event.date,
+                    endDate: event.date.add(const Duration(hours: 2)),
+                  );
+                  Add2Calendar.addEvent2Cal(calendarEvent);
+                },
+              ),
+            ),
           ],
         ),
       ),

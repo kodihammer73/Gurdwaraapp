@@ -1,5 +1,39 @@
 # Gurdwara Mobile App - Progress Log
 
+## Session: Apple 4.2.2 Hardening — "Track My Request" (2026-09-09)
+
+### Completed
+- [x] **Tracking switched from random ID to Phone + NRIC last-4** (2026-09-09):
+  - `submit_request.php`: now requires & stores `nric_last4` (validated as exactly 4 digits; 400 if missing).
+  - `track_request.php`: new lookup mode `?phone=&nric=` returning **all** matching requests (`requests` array); phone compared digit-normalized with tail-matching (handles `0123456789` vs `+60123456789`); legacy `?id=` mode retained; responses sanitized (no phone/NRIC/IP echoed).
+  - App: NRIC field (4-digit, maxLength 4) added to Langar/Booking/Ardas forms + payloads; Track tab now has Mobile Number + NRIC last-4 fields and renders a list ("N requests found"); success dialog updated (no more "save your tracking ID"); `_nricValidator` shared; honest error messages kept (DioException-mapped).
+  - `admin.php` verified to preserve `nric_last4` when updating status (in-place mutation + full re-save).
+  - `flutter analyze`: 0 errors.
+  - ⚠️ Requests submitted BEFORE this change lack `nric_last4` and cannot be tracked by phone+NRIC.
+  - ⚠️ **Deploy both `website/api/submit_request.php` (changed) and `website/api/track_request.php` (new) to the live server** — track_request.php was previously 404 (this caused the "network error" report; app error messages improved to reflect this).
+- [x] **Admin remarks on Approve/Reject** (2026-09-09):
+  - `admin.php`: each request row now has a "Remark (optional)" text input + explicit buttons Approve (✓) / Reject (✕) / Completed (🏁) / Reset-to-Pending (↩); remark saved as `admin_remark` on the record (cleared when blank); status whitelisted (pending/approved/completed/rejected); current remark shown under the buttons; confirm prompt if rejecting with no remark. Also fixed pre-existing bug where the POST confirmation message was never displayed (used `$success`/`$error` instead of `$successMsg`/`$errorMsg`).
+  - `track_request.php`: `sanitizeRequest()` now returns `admin_remark`.
+  - App Track result card: shows "Committee Remark" row when present.
+  - `flutter analyze`: 0 errors.
+  - ⚠️ **Deploy `website/admin.php` and `website/api/track_request.php`** for this feature.
+- [x] **NRIC last-4 replaced with user-chosen 4-digit passcode** (2026-09-09):
+  - `submit_request.php`: stores/validates `passcode` (exactly 4 digits, numbers only).
+  - `track_request.php`: lookup `?phone=&passcode=`; matches new `passcode` field, with fallback to legacy `nric_last4` records; messages updated.
+  - App: all three submit forms use label "4-Digit Passcode *" + helper "Choose any 4 digits to track your request later"; Track tab input label "4-Digit Passcode *"; payloads send `passcode`; success dialog + hints updated; field icon changed to lock; `_passcodeValidator` (4 digits).
+  - `flutter analyze`: 0 errors.
+  - ⚠️ **Deploy `website/api/submit_request.php` and `website/api/track_request.php`** (and re-test end-to-end on the live server before resubmitting to Apple).
+- [x] **New backend endpoint `website/api/track_request.php`**: GET/POST lookup by tracking ID (`REQ-XXXX`, case-insensitive) against `website/data/requests.json`; returns a sanitized subset (no phone/IP/user-agent) with status. 404 with clear message when not found. **Must be deployed to the live server** alongside the app build.
+- [x] **New "Track" tab in Bookings screen** (`lib/widgets/seva_booking_screen.dart`): `TabController` length 3→4, new 4th tab (icon `manage_search`); `_buildTrackTab()` with ID input + "Check Status" button, `_lookupRequest()` GET with `ResponseType.plain` + 10s timeout; result card shows color-coded status (Pending/Approved/Completed/Rejected) plus ID/type/name/date/meal/notes/submitted; clear inline error states (empty ID, not found, network error). Controller disposed.
+- [x] **Home surface** (`lib/main.dart`): new navy "Track My Request" banner card under the Nitnem card → opens Bookings tab; Explore grid Booking card subtitle updated to "Seva, Hall Booking & Tracking".
+- [x] **Success dialog** now tells users to save their tracking ID and points to the Track tab.
+- [x] Verified no `meal`/`meal_type` mismatch (app already sends `meal_type`).
+- [x] `flutter analyze`: 0 errors (31 pre-existing infos only, 2 deprecated `value:` in this file, unrelated).
+
+### Notes
+- Version already at `1.0.15+16` (Info.plist uses `$(FLUTTER_BUILD_NAME)`), no bump required.
+- FCM "Remind me" on events was deferred — no per-event opt-in endpoint exists; Track feature delivers the 4.2.2 interactive-functionality evidence.
+
 ## Session 1: Complete Project Setup with Modern Design (2026-07-23)
 
 ### Completed
