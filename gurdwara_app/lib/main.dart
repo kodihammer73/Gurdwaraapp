@@ -182,6 +182,15 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: _themeMode,
+      builder: (context, child) {
+        // On-screen FCM registration status banner (dismiss by tapping).
+        return Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            const _FcmStatusBanner(),
+          ],
+        );
+      },
       home: AnimatedSwitcher(
         duration: const Duration(milliseconds: 500),
         switchInCurve: Curves.easeOut,
@@ -194,6 +203,88 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
                     onThemeModeChanged: _applyThemeMode,
                   ),
       ),
+    );
+  }
+}
+
+/// On-screen banner showing the FCM/APNs token registration status at launch.
+///
+/// Lets the committee see on the device itself whether notifications
+/// registered successfully — and if not, the exact step/reason — instead of
+/// having to read the debug console.
+class _FcmStatusBanner extends StatefulWidget {
+  const _FcmStatusBanner();
+
+  @override
+  State<_FcmStatusBanner> createState() => _FcmStatusBannerState();
+}
+
+class _FcmStatusBannerState extends State<_FcmStatusBanner> {
+  bool _dismissed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<String>(
+      valueListenable: NotificationService.registrationStatus,
+      builder: (context, status, _) {
+        if (_dismissed) return const SizedBox.shrink();
+        final bool success = status.startsWith('✅');
+        final bool failed = status.startsWith('❌') || status.startsWith('⚠️');
+
+        // On success, auto-hide after a short pause.
+        if (success) {
+          Future.delayed(const Duration(seconds: 6), () {
+            if (mounted && !_dismissed) setState(() => _dismissed = true);
+          });
+        }
+
+        return SafeArea(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8, left: 12, right: 12),
+              child: GestureDetector(
+                onTap: () => setState(() => _dismissed = true),
+                child: Material(
+                  elevation: 6,
+                  borderRadius: BorderRadius.circular(10),
+                  color: failed
+                      ? Colors.red.shade800
+                      : (success ? Colors.green.shade800 : Colors.orange.shade800),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!success && !failed)
+                          const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          ),
+                        if (!success && !failed) const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            status,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.close, size: 14, color: Colors.white70),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

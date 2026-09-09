@@ -8,6 +8,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -32,6 +33,17 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   final Dio _dio = Dio();
   late SharedPreferences _prefs;
+
+  /// Live FCM/APNs registration status, shown on-screen at launch so the
+  /// committee can see exactly what step registration reached (or why it
+  /// failed) without needing a debug console.
+  static final ValueNotifier<String> registrationStatus =
+      ValueNotifier<String>('Notifications: registering…');
+
+  static void _setStatus(String s) {
+    registrationStatus.value = s;
+    print('🔔 status: $s');
+  }
 
 
   Future<void> initialize() async {
@@ -78,9 +90,11 @@ class NotificationService {
     if (token != null) {
       print('FCM Token: $token');
       _prefs.setString('fcm_token', token);
+      _setStatus('Token received — sending to server…');
       await _registerDeviceToken(token);
     } else {
       print('⚠️ FCM/APNs token unavailable after retries (iOS may still deliver later via refresh)');
+      _setStatus('⚠️ No FCM/APNs token after 8 retries. Check APNs key / entitlement / network.');
     }
 
     // Listen for token refresh
@@ -315,11 +329,15 @@ class NotificationService {
       print('✅ Device token registered with backend'
           ' (platform=$platform, appVersion=$appVersion)');
       print('   HTTP ${response.statusCode}: ${response.data}');
+      _setStatus('✅ Notifications ready (HTTP ${response.statusCode})');
     } catch (e) {
       // Expose the real error so iOS registration failures are visible
       // in the run log instead of being silently swallowed.
       print('⚠️ Failed to register device token '
           '(platform=$platform, appVersion=$appVersion): $e');
+      String reason = e.toString();
+      if (reason.length > 140) reason = '${reason.substring(0, 140)}…';
+      _setStatus('❌ Register failed: $reason');
     }
   }
 
