@@ -94,7 +94,14 @@ class NotificationService {
       await _registerDeviceToken(token);
     } else {
       print('⚠️ FCM/APNs token unavailable after retries (iOS may still deliver later via refresh)');
-      _setStatus('⚠️ No FCM/APNs token after 8 retries. Check APNs key / entitlement / network.');
+      if (!_lastApnsTokenPresent) {
+        _setStatus('⚠️ No APNs token. App likely signed WITHOUT push entitlement '
+            '(regenerate the distribution profile with Push enabled), or the APNs '
+            'key is missing in Firebase. Detail: ${_short(_lastTokenError)}');
+      } else {
+        _setStatus('⚠️ APNs OK but no FCM token. Check Firebase setup / network. '
+            'Detail: ${_short(_lastTokenError)}');
+      }
     }
 
     // Listen for token refresh
@@ -381,6 +388,8 @@ class NotificationService {
         'apns_token': _maskToken(apnsToken),
         'fcm_token': _maskToken(fcmToken),
         'auth_status': authStatus,
+        'apns_token_present': apnsToken != null && apnsToken.isNotEmpty ? 'true' : 'false',
+        'last_token_error': _lastTokenError,
       };
 
       final resp = await _dio.post(
@@ -445,17 +454,32 @@ class NotificationService {
         await Future.delayed(delay);
       }
       try {
+        // Check APNs reachability first — FCM cannot mint a token without it.
+        final String? apns = await FirebaseMessaging.instance.getAPNSToken();
+        _lastApnsTokenPresent = apns != null && apns.isNotEmpty;
         final String? token = await FirebaseMessaging.instance.getToken();
         if (token != null) {
           print('FCM/APNs token obtained on attempt ${i + 1}');
           return token;
         }
+        _lastTokenError = 'getToken() returned null (attempt ${i + 1})';
       } catch (e) {
         print('⚠️ getToken() threw on attempt ${i + 1}: $e');
+        _lastTokenError = e.toString();
       }
     }
     return null;
   }
+
+  /// Last error observed while fetching the FCM token (for on-screen banner).
+  String _lastTokenError = '';
+
+  /// Whether an APNs token was ever observed during the last retry loop.
+  bool _lastApnsTokenPresent = false;
+
+  /// Truncates a diagnostic string for the on-screen banner.
+  String _short(String s, [int max = 110]) =>
+      s.length <= max ? s : '${s.substring(0, max)}…';
 
   Future<void> manualCheckAndNotify() async {
     await checkAndSendEventNotifications();
