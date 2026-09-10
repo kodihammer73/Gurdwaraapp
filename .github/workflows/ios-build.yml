@@ -96,6 +96,10 @@ jobs:
         cp "$PROFILE_PATH" "$APP/embedded.mobileprovision"
         # Extract the profile's entitlements (includes aps-environment)
         security cms -D -i "$PROFILE_PATH" > "$RUNNER_TEMP/profile.plist"
+        echo "===== PROFILE ENTITLEMENTS (from provisioning profile) ====="
+        /usr/libexec/PlistBuddy -x -c "Print :Entitlements" "$RUNNER_TEMP/profile.plist" 2>&1 || echo "PlistBuddy failed to read entitlements"
+        /usr/libexec/PlistBuddy -x -c "Print :Entitlements:aps-environment" "$RUNNER_TEMP/profile.plist" 2>&1 || echo "aps-environment NOT FOUND in profile"
+        echo "===== END PROFILE ENTITLEMENTS ====="
         /usr/libexec/PlistBuddy -x -c "Print :Entitlements" "$RUNNER_TEMP/profile.plist" > "$RUNNER_TEMP/entitlements.plist"
         # Sign nested frameworks first (no app-level entitlements)
         while IFS= read -r -d '' fw; do
@@ -104,7 +108,10 @@ jobs:
         # Sign the app bundle; applies entitlements to the main executable
         /usr/bin/codesign --force --sign "iPhone Distribution" \
           --entitlements "$RUNNER_TEMP/entitlements.plist" "$APP"
+        echo "===== SIGNED BINARY ENTITLEMENTS ====="
+        codesign -d --entitlements - "$APP" 2>&1 | head -20
         codesign -dv --verbose=4 "$APP" 2>&1 | sed -n '1,15p'
+        echo "===== END SIGNED BINARY ENTITLEMENTS ====="
         # Package into an .ipa (Payload/Runner.app)
         rm -rf Payload
         mkdir -p Payload
