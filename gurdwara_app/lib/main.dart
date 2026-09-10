@@ -309,48 +309,43 @@ class _FcmStatusBannerState extends State<_FcmStatusBanner> {
 
   void _showDetails(BuildContext context) {
     final List<String> log = NotificationService.registrationLog.value;
-    final String body = log.isEmpty ? 'No log entries yet.' : log.join('\n');
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Notification registration log'),
-          contentPadding:
-              const EdgeInsets.only(left: 20, right: 20, top: 16, bottom: 8),
-          content: SizedBox(
-            width: double.maxFinite,
-            height: 360,
-            child: SingleChildScrollView(
-              child: SelectableText(
-                body,
-                style: const TextStyle(
-                    fontSize: 11, fontFamily: 'monospace', height: 1.5),
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext pageContext) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Notification registration log'),
+            actions: <Widget>[
+              IconButton(
+                icon: const Icon(Icons.copy),
+                tooltip: 'Copy log',
+                onPressed: () async {
+                  final String body =
+                      log.isEmpty ? 'No log entries yet.' : log.join('\n');
+                  await Clipboard.setData(ClipboardData(text: body));
+                  if (pageContext.mounted) {
+                    ScaffoldMessenger.of(pageContext).showSnackBar(
+                      const SnackBar(
+                        content: Text('Log copied to clipboard'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
               ),
+            ],
+          ),
+          body: ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: log.length,
+            itemBuilder: (BuildContext context, int index) => Text(
+              log[index],
+              style: const TextStyle(
+                  fontSize: 12, fontFamily: 'monospace', height: 1.6),
             ),
           ),
-          actions: <Widget>[
-            TextButton.icon(
-              icon: const Icon(Icons.copy, size: 16),
-              label: const Text('Copy'),
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: body));
-                if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('Log copied to clipboard'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                }
-              },
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
+        ),
+        fullscreenDialog: true,
+      ),
     );
   }
 }
