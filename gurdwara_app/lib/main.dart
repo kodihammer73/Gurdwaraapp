@@ -30,8 +30,6 @@ import 'widgets/onboarding_screen.dart';
 import 'widgets/settings_screen.dart';
 import 'widgets/whats_new_screen.dart';
 
-
-
 // ⭐ ADD THESE GLOBAL CONSTANTS (they were missing)
 const String _siteBaseUrl = 'https://www.gurdwarasahibmelaka.com';
 const String _siteLogoAsset = 'web/logo.png';
@@ -50,7 +48,7 @@ final Dio _dio = Dio(
 // ⭐ MAKE SURE you only have ONE main() function
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Clean initialization check using Firebase.apps (never throws StateError)
   try {
     if (Firebase.apps.isEmpty) {
@@ -70,7 +68,7 @@ void main() async {
   } catch (e, stack) {
     print('⚠️ Notification Service init failed: $e\n$stack');
   }
-  
+
   runApp(const ProviderScope(child: GurdwaraApp()));
 }
 
@@ -95,7 +93,6 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
     _checkOnboarding();
     LocalizationService.instance.load();
   }
-
 
   /// Checks whether the user has seen the onboarding screen before.
   /// If not, shows it after the splash.
@@ -127,7 +124,6 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
       if (mounted) maybeShowWhatsNew(context);
     });
   }
-
 
   /// Loads the user's theme preference from SharedPreferences.
   Future<void> _loadThemeMode() async {
@@ -199,10 +195,8 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
         child: _showSplash
             ? const BrandedSplashScreen()
             : _showOnboarding
-                ? OnboardingScreen(onFinished: _finishOnboarding)
-                : HomeScreen(
-                    onThemeModeChanged: _applyThemeMode,
-                  ),
+            ? OnboardingScreen(onFinished: _finishOnboarding)
+            : HomeScreen(onThemeModeChanged: _applyThemeMode),
       ),
     );
   }
@@ -258,13 +252,15 @@ class _FcmStatusBannerState extends State<_FcmStatusBanner> {
                   color: failed
                       ? Colors.red.shade800
                       : (success
-                          ? Colors.green.shade800
-                          : Colors.orange.shade800),
+                            ? Colors.green.shade800
+                            : Colors.orange.shade800),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 360),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
@@ -274,8 +270,9 @@ class _FcmStatusBannerState extends State<_FcmStatusBanner> {
                               height: 12,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             ),
                           if (!success && !failed) const SizedBox(width: 8),
@@ -285,7 +282,9 @@ class _FcmStatusBannerState extends State<_FcmStatusBanner> {
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                  color: Colors.white, fontSize: 12),
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -319,8 +318,9 @@ class _FcmStatusBannerState extends State<_FcmStatusBanner> {
                 icon: const Icon(Icons.copy),
                 tooltip: 'Copy log',
                 onPressed: () async {
-                  final String body =
-                      log.isEmpty ? 'No log entries yet.' : log.join('\n');
+                  final String body = log.isEmpty
+                      ? 'No log entries yet.'
+                      : log.join('\n');
                   await Clipboard.setData(ClipboardData(text: body));
                   if (pageContext.mounted) {
                     ScaffoldMessenger.of(pageContext).showSnackBar(
@@ -340,7 +340,10 @@ class _FcmStatusBannerState extends State<_FcmStatusBanner> {
             itemBuilder: (BuildContext context, int index) => Text(
               log[index],
               style: const TextStyle(
-                  fontSize: 12, fontFamily: 'monospace', height: 1.6),
+                fontSize: 12,
+                fontFamily: 'monospace',
+                height: 1.6,
+              ),
             ),
           ),
         ),
@@ -349,8 +352,6 @@ class _FcmStatusBannerState extends State<_FcmStatusBanner> {
     );
   }
 }
-
-
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.onThemeModeChanged});
@@ -379,7 +380,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-
   /// Maps a notification screen name to a bottom-nav tab index.
   void _handleNotificationTap(String screen) {
     final index = switch (screen) {
@@ -398,49 +398,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _selectedIndex = index;
     });
   }
-
-  void _openDebugLog(BuildContext context) {
-    final List<String> log = NotificationService.registrationLog.value;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (BuildContext pageContext) => Scaffold(
-          appBar: AppBar(
-            title: const Text('Notification registration log'),
-            actions: <Widget>[
-              IconButton(
-                icon: const Icon(Icons.copy),
-                tooltip: 'Copy log',
-                onPressed: () async {
-                  final String body =
-                      log.isEmpty ? 'No log entries yet.' : log.join('\n');
-                  await Clipboard.setData(ClipboardData(text: body));
-                  if (pageContext.mounted) {
-                    ScaffoldMessenger.of(pageContext).showSnackBar(
-                      const SnackBar(
-                        content: Text('Log copied to clipboard'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ],
-          ),
-          body: ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: log.length,
-            itemBuilder: (BuildContext context, int index) => Text(
-              log[index],
-              style: const TextStyle(
-                  fontSize: 12, fontFamily: 'monospace', height: 1.6),
-            ),
-          ),
-        ),
-        fullscreenDialog: true,
-      ),
-    );
-  }
-
 
   Widget _buildScreen(int index) {
     switch (index) {
@@ -462,9 +419,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 3:
         return const AboutScreen();
       case 4:
-        return SettingsScreen(
-          onThemeModeChanged: widget.onThemeModeChanged,
-        );
+        return SettingsScreen(onThemeModeChanged: widget.onThemeModeChanged);
       default:
         return HomeScreenContent(
           onCalendarSelected: () => _selectTab(1),
@@ -482,16 +437,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gurdwara Sahib Melaka'),
-        actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.bug_report_outlined),
-            tooltip: 'Notification debug log',
-            onPressed: () => _openDebugLog(context),
-          ),
-        ],
-      ),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         switchInCurve: Curves.easeOut,
@@ -512,11 +457,6 @@ class _HomeScreenState extends State<HomeScreen> {
           key: ValueKey(_selectedIndex),
           child: _buildScreen(_selectedIndex),
         ),
-      ),
-      floatingActionButton: FloatingActionButton.small(
-        tooltip: 'Notification debug log',
-        onPressed: () => _openDebugLog(context),
-        child: const Icon(Icons.bug_report),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
@@ -593,7 +533,9 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
   Future<void> _loadContactNumber() async {
     String number = '';
     try {
-      final response = await _dio.get<String>('$_siteBaseUrl/contact_data.json');
+      final response = await _dio.get<String>(
+        '$_siteBaseUrl/contact_data.json',
+      );
       final raw = response.data ?? '';
       if (raw.isNotEmpty) {
         final json = jsonDecode(raw);
@@ -608,7 +550,6 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
     }
   }
 
-
   Future<void> _refresh() async {
     setState(() {
       _future = _fetchUpcomingEvents();
@@ -618,7 +559,6 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
       setState(() => _lastUpdated = DateTime.now());
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -648,7 +588,9 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFE8A838).withValues(alpha: 0.45),
+                          color: const Color(
+                            0xFFE8A838,
+                          ).withValues(alpha: 0.45),
                           blurRadius: 8,
                           spreadRadius: 1,
                         ),
@@ -660,10 +602,26 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                         filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
                         child: ColorFiltered(
                           colorFilter: const ColorFilter.matrix(<double>[
-                            0, 0, 0, 0, 0xE8,
-                            0, 0, 0, 0, 0xA8,
-                            0, 0, 0, 0, 0x38,
-                            0, 0, 0, 1, 0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0xE8,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0xA8,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0x38,
+                            0,
+                            0,
+                            0,
+                            1,
+                            0,
                           ]),
                           child: Image.asset(
                             'web/translogo.png',
@@ -684,10 +642,10 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                   Text(
                     'GURDWARA SAHIB MELAKA',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontFamily: 'Georgia',
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.4,
-                        ),
+                      fontFamily: 'Georgia',
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.4,
+                    ),
                   ),
                 ],
               ),
@@ -753,10 +711,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFFE8A838),
-                              Color(0xFFC5851E),
-                            ],
+                            colors: [Color(0xFFE8A838), Color(0xFFC5851E)],
                           ),
                         ),
                       ),
@@ -765,10 +720,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFFE8A838),
-                              Color(0xFFC5851E),
-                            ],
+                            colors: [Color(0xFFE8A838), Color(0xFFC5851E)],
                           ),
                         ),
                       ),
@@ -779,10 +731,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Color(0xCC1B365D),
-                          ],
+                          colors: [Colors.transparent, Color(0xCC1B365D)],
                           stops: [0.35, 1.0],
                         ),
                       ),
@@ -839,10 +788,13 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      DateFormat('EEEE, d MMMM yyyy')
-                                          .format(DateTime.now()),
+                                      DateFormat(
+                                        'EEEE, d MMMM yyyy',
+                                      ).format(DateTime.now()),
                                       style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.95),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.95,
+                                        ),
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
                                         letterSpacing: 0.4,
@@ -869,23 +821,39 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
             // Nitnem & Prayer Reader quick launcher card
             Card(
               elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               color: const Color(0xFFE8A838),
               child: ListTile(
-                leading: const Icon(Icons.menu_book, color: Colors.white, size: 30),
+                leading: const Icon(
+                  Icons.menu_book,
+                  color: Colors.white,
+                  size: 30,
+                ),
                 title: const Text(
                   'Nitnem & Prayer Reader',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
                 subtitle: const Text(
                   'Read Daily Nitnem with Gurmukhi & English Translation',
                   style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
-                trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.white,
+                  size: 16,
+                ),
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const PrayerReaderScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const PrayerReaderScreen(),
+                    ),
                   );
                 },
               ),
@@ -895,19 +863,33 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
             // "Track My Request" banner — surfaces the request-tracking feature
             Card(
               elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               color: const Color(0xFF1B365D),
               child: ListTile(
-                leading: const Icon(Icons.manage_search_rounded, color: Color(0xFFE8A838), size: 30),
+                leading: const Icon(
+                  Icons.manage_search_rounded,
+                  color: Color(0xFFE8A838),
+                  size: 30,
+                ),
                 title: const Text(
                   'Track My Request',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
                 subtitle: const Text(
                   'Check the live status of your Langar, Hall Booking or Ardas request',
                   style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
-                trailing: const Icon(Icons.arrow_forward_ios, color: Color(0xFFE8A838), size: 16),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Color(0xFFE8A838),
+                  size: 16,
+                ),
                 onTap: widget.onBookingSelected,
               ),
             ),
@@ -929,10 +911,9 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                       '${LocalizationService.instance.t('last_updated')} '
                       '${DateFormat('h:mm a').format(_lastUpdated!.toLocal())}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
-
                   ],
                 ),
               ),
@@ -955,9 +936,9 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               child: Text(
                 'Explore',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
-                    ),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
               ),
             ),
             const SizedBox(height: 4),
@@ -1053,9 +1034,9 @@ class _QuickActionsRow extends StatelessWidget {
     final uri = Uri.parse(url);
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open $url')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not open $url')));
     }
   }
 
@@ -1074,9 +1055,9 @@ class _QuickActionsRow extends StatelessWidget {
       mode: LaunchMode.externalApplication,
     );
     if (!openedFallback && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open WhatsApp')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not open WhatsApp')));
     }
   }
 
@@ -1107,7 +1088,6 @@ class _QuickActionsRow extends StatelessWidget {
     );
   }
 }
-
 
 class _QuickAction extends StatelessWidget {
   const _QuickAction({
@@ -1160,10 +1140,7 @@ class _QuickAction extends StatelessWidget {
 /// Wraps any child widget with a vibrant gradient background, soft shadows,
 /// and decorative geometric shapes.
 class _ImmersiveInfoCard extends StatelessWidget {
-  const _ImmersiveInfoCard({
-    required this.gradientColors,
-    required this.child,
-  });
+  const _ImmersiveInfoCard({required this.gradientColors, required this.child});
 
   final List<Color> gradientColors;
   final Widget child;
@@ -1246,10 +1223,7 @@ class _ImmersiveInfoCard extends StatelessWidget {
               ),
             ),
             // Content (not Positioned.fill - let it size naturally)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: child,
-            ),
+            Padding(padding: const EdgeInsets.all(16), child: child),
           ],
         ),
       ),
@@ -1351,7 +1325,6 @@ class _BarsiFullContent extends StatefulWidget {
 class _BarsiFullContentState extends State<_BarsiFullContent> {
   late Future<_BarsiEvent> _future;
 
-
   @override
   void initState() {
     super.initState();
@@ -1382,7 +1355,8 @@ class _BarsiFullContentState extends State<_BarsiFullContent> {
 
         final event = snapshot.data!;
         final now = DateTime.now();
-        final isActive = now.isAfter(event.startDate) && now.isBefore(event.endDate);
+        final isActive =
+            now.isAfter(event.startDate) && now.isBefore(event.endDate);
         final isPassed = now.isAfter(event.endDate);
 
         String countdownText;
@@ -1406,8 +1380,18 @@ class _BarsiFullContentState extends State<_BarsiFullContent> {
         }
 
         final monthNames = [
-          'January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'
+          'January',
+          'February',
+          'March',
+          'April',
+          'May',
+          'June',
+          'July',
+          'August',
+          'September',
+          'October',
+          'November',
+          'December',
         ];
 
         return Column(
@@ -1516,6 +1500,7 @@ class _BarsiEvent {
   final int startDay;
   final int endDay;
   final int year;
+
   /// Calendar month (1–12). Defaults to 5 (May) when not specified in data.
   final int month;
   final DateTime startDate;
@@ -1678,8 +1663,9 @@ class _SplashLoadingState extends State<_SplashLoading>
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFE8A838)
-                            .withValues(alpha: 0.25 + 0.25 * _pulse.value),
+                        color: const Color(
+                          0xFFE8A838,
+                        ).withValues(alpha: 0.25 + 0.25 * _pulse.value),
                         blurRadius: 18 + 10 * _pulse.value,
                         spreadRadius: 1,
                       ),
@@ -1722,8 +1708,6 @@ class _SplashLoadingState extends State<_SplashLoading>
   }
 }
 
-
-
 /// A card that collapses a consecutive-day run (e.g. a 3-day Akhand Path)
 /// into a single entry, listing each remaining day inline with its
 /// Start / Continue / End label and a red "live" dot on the active day.
@@ -1747,10 +1731,12 @@ class _EventRunCard extends StatelessWidget {
     String dateRange;
     if (first.date.year == last.date.year &&
         first.date.month == last.date.month) {
-      dateRange = '${DateFormat('d').format(first.date)} – '
+      dateRange =
+          '${DateFormat('d').format(first.date)} – '
           '${DateFormat('d MMM yyyy').format(last.date)}';
     } else {
-      dateRange = '${DateFormat('d MMM').format(first.date)} – '
+      dateRange =
+          '${DateFormat('d MMM').format(first.date)} – '
           '${DateFormat('d MMM yyyy').format(last.date)}';
     }
 
@@ -1823,8 +1809,9 @@ class _EventRunCard extends StatelessWidget {
     DateTime now,
   ) {
     final isToday = dateOnly(day.date) == today;
-    final isLive =
-        day.isAkhandPath ? isAkhandDayLive(day, now) : isNowLive(day, now);
+    final isLive = day.isAkhandPath
+        ? isAkhandDayLive(day, now)
+        : isNowLive(day, now);
     final showLiveDot = isToday && isLive;
 
     final String label;
@@ -1971,13 +1958,19 @@ class _HomepageEventTile extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: TextButton.icon(
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 2,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   foregroundColor: palette.foreground,
                 ),
                 icon: const Icon(Icons.calendar_today, size: 13),
-                label: const Text('Add to Calendar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                label: const Text(
+                  'Add to Calendar',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
                 onPressed: () {
                   final calendarEvent = Event(
                     title: event.title,
@@ -2134,7 +2127,9 @@ Future<List<HomepageEvent>> _fetchEventsWithCache() async {
   }
 }
 
-Map<DateTime, List<HomepageEvent>> _groupEventsByDate(List<HomepageEvent> events) {
+Map<DateTime, List<HomepageEvent>> _groupEventsByDate(
+  List<HomepageEvent> events,
+) {
   final grouped = <DateTime, List<HomepageEvent>>{};
 
   for (final event in events) {
@@ -2147,7 +2142,10 @@ Map<DateTime, List<HomepageEvent>> _groupEventsByDate(List<HomepageEvent> events
 
 /// Host extracted from a description, mirroring the website's `extractHost`.
 String _extractHost(String description) {
-  final m = RegExp(r'by\s+([^@\n]+)', caseSensitive: false).firstMatch(description);
+  final m = RegExp(
+    r'by\s+([^@\n]+)',
+    caseSensitive: false,
+  ).firstMatch(description);
   if (m == null) return '';
   final host = m.group(1)!.trim().replaceAll(RegExp(r'\s+'), ' ');
   return host.isEmpty ? '' : host;
@@ -2156,9 +2154,10 @@ String _extractHost(String description) {
 /// Parses an "@9am" / "@6.30am" / "@3.30pm" style time from a description and
 /// returns the full DateTime on the given event date, or null if no time found.
 DateTime? parseStartAt(String details, DateTime date) {
-  final m = RegExp(r'@\s*(\d{1,2}(?:\.\d{1,2})?)\s*([ap])m',
-          caseSensitive: false)
-      .firstMatch(details);
+  final m = RegExp(
+    r'@\s*(\d{1,2}(?:\.\d{1,2})?)\s*([ap])m',
+    caseSensitive: false,
+  ).firstMatch(details);
   if (m == null) return null;
 
   final timePart = m.group(1)!;
@@ -2303,7 +2302,10 @@ DateTime? _entriesStartAt(List<HomepageEvent> days) {
 /// 9am and 4pm) in time order until one goes live, at which point it floats to
 /// the top, then falls back to time order once its +4h window ends.
 int compareEntriesLiveNow(
-    List<HomepageEvent> a, List<HomepageEvent> b, DateTime now) {
+  List<HomepageEvent> a,
+  List<HomepageEvent> b,
+  DateTime now,
+) {
   final aLive = _entriesLiveNow(a, now);
   final bLive = _entriesLiveNow(b, now);
   if (aLive != bLive) return aLive ? -1 : 1;
@@ -2384,22 +2386,25 @@ DateTime dateOnly(DateTime dateTime) {
 DateTime upcomingWindowEnd(DateTime today) {
   final daysUntilSunday = DateTime.sunday - today.weekday;
   final nextSunday = today.add(Duration(days: daysUntilSunday));
-  final minEnd = today.add(const Duration(days: 2)); // today + Sunday + next day
+  final minEnd = today.add(
+    const Duration(days: 2),
+  ); // today + Sunday + next day
   return minEnd.isAfter(nextSunday) ? minEnd : nextSunday;
 }
 
 /// Keys an event identity for run-expansion de-duplication.
-String _runKey(HomepageEvent e) =>
-    e.runId.isNotEmpty
-        ? '${e.runId}|${dateOnly(e.date)}'
-        : 'single|${e.title}|${dateOnly(e.date)}';
+String _runKey(HomepageEvent e) => e.runId.isNotEmpty
+    ? '${e.runId}|${dateOnly(e.date)}'
+    : 'single|${e.title}|${dateOnly(e.date)}';
 
 /// Filters [allEvents] to the rolling "this week" window and expands any
 /// started Akhand Path run that touches the window to include all of its
 /// remaining days (so a Saturday start shows through Monday, and a Sunday
 /// start shows through Tuesday).
 List<HomepageEvent> filterUpcomingWindow(
-    List<HomepageEvent> allEvents, DateTime today) {
+  List<HomepageEvent> allEvents,
+  DateTime today,
+) {
   final endOfWindow = upcomingWindowEnd(today);
   final windowEvents = allEvents.where((event) {
     final eventDate = dateOnly(event.date);
@@ -2418,10 +2423,12 @@ List<HomepageEvent> filterUpcomingWindow(
 
   final added = <HomepageEvent>[];
   for (final runId in runIds) {
-    for (final full in allEvents.where((e) =>
-        e.isAkhandPath &&
-        e.runId == runId &&
-        !dateOnly(e.date).isBefore(today))) {
+    for (final full in allEvents.where(
+      (e) =>
+          e.isAkhandPath &&
+          e.runId == runId &&
+          !dateOnly(e.date).isBefore(today),
+    )) {
       final key = _runKey(full);
       if (present.containsKey(key)) continue;
       present[key] = full;
@@ -2564,8 +2571,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                           events[i].title,
                                           style: theme.textTheme.titleMedium
                                               ?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                          ),
+                                                fontWeight: FontWeight.w700,
+                                              ),
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
@@ -2655,7 +2662,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 actions: [
                   // Toggle between month grid and list view
                   IconButton(
-                    tooltip: _showListView ? 'Show month grid' : 'Show event list',
+                    tooltip: _showListView
+                        ? 'Show month grid'
+                        : 'Show event list',
                     icon: Icon(
                       _showListView
                           ? Icons.calendar_month_outlined
@@ -2673,107 +2682,98 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 SliverPadding(
                   padding: const EdgeInsets.all(16),
                   sliver: SliverList(
-                    delegate: SliverChildListDelegate(
-                      [
-                        // Today button
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: _jumpToToday,
-                            icon: const Icon(Icons.today_rounded, size: 18),
-                            label: const Text('Today'),
-                          ),
+                    delegate: SliverChildListDelegate([
+                      // Today button
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: _jumpToToday,
+                          icon: const Icon(Icons.today_rounded, size: 18),
+                          label: const Text('Today'),
                         ),
-                        const SizedBox(height: 8),
-                        if (_filterUpcomingEvents(events).isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.event_busy_rounded,
-                                  size: 56,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .outline,
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'No upcoming events.',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          ..._filterUpcomingEvents(events).map(
-                            (event) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Card(
-                                margin: EdgeInsets.zero,
-                                child: ListTile(
-                                  leading: Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primaryContainer
-                                          .withValues(alpha: 0.6),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          '${event.date.day}',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleMedium
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.w800,
-                                              ),
-                                        ),
-                                        Text(
-                                          DateFormat('MMM')
-                                              .format(event.date)
-                                              .toUpperCase(),
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .labelSmall,
-                                        ),
-                                      ],
-                                    ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (_filterUpcomingEvents(events).isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.event_busy_rounded,
+                                size: 56,
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No upcoming events.',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        ..._filterUpcomingEvents(events).map(
+                          (event) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Card(
+                              margin: EdgeInsets.zero,
+                              child: ListTile(
+                                leading: Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primaryContainer
+                                        .withValues(alpha: 0.6),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  title: Text(
-                                    event.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '${event.date.day}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                      Text(
+                                        DateFormat(
+                                          'MMM',
+                                        ).format(event.date).toUpperCase(),
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.labelSmall,
+                                      ),
+                                    ],
                                   ),
-                                  subtitle: event.details.isEmpty
-                                      ? null
-                                      : Text(
-                                          event.details,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                  onTap: () {
-                                    _showDateDetails(
-                                      context,
-                                      event.date,
-                                      [event],
-                                    );
-                                  },
                                 ),
+                                title: Text(
+                                  event.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: event.details.isEmpty
+                                    ? null
+                                    : Text(
+                                        event.details,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                onTap: () {
+                                  _showDateDetails(context, event.date, [
+                                    event,
+                                  ]);
+                                },
                               ),
                             ),
                           ),
-                      ],
-                    ),
+                        ),
+                    ]),
                   ),
                 )
               else
@@ -2830,7 +2830,9 @@ class _CalendarMonthCard extends StatelessWidget {
       color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.25)),
+        side: BorderSide(
+          color: theme.colorScheme.primary.withValues(alpha: 0.25),
+        ),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Padding(
@@ -2883,7 +2885,8 @@ class _CalendarMonthCard extends StatelessWidget {
                 final date = startDate.add(Duration(days: index));
                 final isCurrentMonth = date.month == month.month;
                 final dateKey = dateOnly(date);
-                final eventsForDate = groupedEvents[dateKey] ?? const <HomepageEvent>[];
+                final eventsForDate =
+                    groupedEvents[dateKey] ?? const <HomepageEvent>[];
                 final hasEvents = eventsForDate.isNotEmpty;
                 final isToday = dateKey == today;
 
@@ -2893,17 +2896,21 @@ class _CalendarMonthCard extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       color: isToday
-                          ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.85)
+                          ? theme.colorScheme.secondaryContainer.withValues(
+                              alpha: 0.85,
+                            )
                           : hasEvents
-                              ? theme.colorScheme.tertiaryContainer.withValues(alpha: 0.65)
-                              : theme.colorScheme.surface.withValues(alpha: 0.85),
+                          ? theme.colorScheme.tertiaryContainer.withValues(
+                              alpha: 0.65,
+                            )
+                          : theme.colorScheme.surface.withValues(alpha: 0.85),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isToday
                             ? theme.colorScheme.secondary
                             : hasEvents
-                                ? theme.colorScheme.tertiary.withValues(alpha: 0.35)
-                                : theme.colorScheme.outlineVariant,
+                            ? theme.colorScheme.tertiary.withValues(alpha: 0.35)
+                            : theme.colorScheme.outlineVariant,
                       ),
                     ),
                     child: Stack(
@@ -2917,7 +2924,9 @@ class _CalendarMonthCard extends StatelessWidget {
                               fontWeight: FontWeight.w700,
                               color: isCurrentMonth
                                   ? theme.colorScheme.onSurface
-                                  : theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                                  : theme.colorScheme.onSurface.withValues(
+                                      alpha: 0.35,
+                                    ),
                             ),
                           ),
                         ),
@@ -2957,9 +2966,9 @@ class _WeekdayLabel extends StatelessWidget {
     return Center(
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -3003,7 +3012,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
             _selectedCategory = firstCategory;
 
             if (data.categoryYears[firstCategory]!.isNotEmpty) {
-              _selectedYear[firstCategory] = data.categoryYears[firstCategory]!.first;
+              _selectedYear[firstCategory] =
+                  data.categoryYears[firstCategory]!.first;
             } else {
               _selectedYear[firstCategory] = null;
             }
@@ -3027,8 +3037,12 @@ class _GalleryScreenState extends State<GalleryScreen> {
     final categoryImages = <String, Set<_GalleryImage>>{};
     final categoryYears = <String, List<int>>{};
 
-    Future<_GalleryPageResult?> fetchGalleryPage(String event, {int? year}) async {
-      final url = '$_siteBaseUrl/ajax_gallery.php?event=$event${year != null ? '&year=$year' : ''}';
+    Future<_GalleryPageResult?> fetchGalleryPage(
+      String event, {
+      int? year,
+    }) async {
+      final url =
+          '$_siteBaseUrl/ajax_gallery.php?event=$event${year != null ? '&year=$year' : ''}';
       final response = await _dio.get<String>(url);
       final raw = (response.data ?? '').trim();
       if (raw.isEmpty) return null;
@@ -3064,10 +3078,13 @@ class _GalleryScreenState extends State<GalleryScreen> {
             if (thumbRaw.isEmpty) {
               // Fall back to the full URL if no thumbnail is provided
               thumbUrl = fullUrl;
-            } else if (thumbRaw.startsWith('http://') || thumbRaw.startsWith('https://')) {
+            } else if (thumbRaw.startsWith('http://') ||
+                thumbRaw.startsWith('https://')) {
               thumbUrl = thumbRaw;
             } else {
-              final thumbPath = thumbRaw.startsWith('/') ? thumbRaw : '/$thumbRaw';
+              final thumbPath = thumbRaw.startsWith('/')
+                  ? thumbRaw
+                  : '/$thumbRaw';
               thumbUrl = '$_siteBaseUrl$thumbPath';
             }
 
@@ -3079,9 +3096,23 @@ class _GalleryScreenState extends State<GalleryScreen> {
     }
 
     const yearsToCheck = [
-
-      2026, 2025, 2024, 2023, 2022, 2021, 2020,
-      2019, 2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011, 2010,
+      2026,
+      2025,
+      2024,
+      2023,
+      2022,
+      2021,
+      2020,
+      2019,
+      2018,
+      2017,
+      2016,
+      2015,
+      2014,
+      2013,
+      2012,
+      2011,
+      2010,
     ];
 
     // Process categories sequentially but fetch all years for each category in parallel
@@ -3109,7 +3140,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
           }
         }
       }
-
 
       final years = yearSet.toList()..sort((a, b) => b.compareTo(a));
       categoryYears[category] = years;
@@ -3151,13 +3181,13 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     return RefreshIndicator(
       onRefresh: _refresh,
       child: FutureBuilder<_GalleryData>(
         future: _future,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
             return const CustomScrollView(
               physics: AlwaysScrollableScrollPhysics(),
               slivers: [
@@ -3253,18 +3283,21 @@ class _GalleryScreenState extends State<GalleryScreen> {
                               ),
                               _GalleryUrlItem(
                                 image: _GalleryImage(
-                                  thumbUrl: 'https://picsum.photos/600/400?random=1',
-                                  fullUrl: 'https://picsum.photos/600/400?random=1',
+                                  thumbUrl:
+                                      'https://picsum.photos/600/400?random=1',
+                                  fullUrl:
+                                      'https://picsum.photos/600/400?random=1',
                                 ),
                               ),
                               _GalleryUrlItem(
                                 image: _GalleryImage(
-                                  thumbUrl: 'https://picsum.photos/600/400?random=2',
-                                  fullUrl: 'https://picsum.photos/600/400?random=2',
+                                  thumbUrl:
+                                      'https://picsum.photos/600/400?random=2',
+                                  fullUrl:
+                                      'https://picsum.photos/600/400?random=2',
                                 ),
                               ),
                             ],
-
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -3294,34 +3327,101 @@ class _GalleryScreenState extends State<GalleryScreen> {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 sliver: SliverList(
-                  delegate: SliverChildListDelegate(
-                    [
-                      Column(
-                        children: [
+                  delegate: SliverChildListDelegate([
+                    Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            for (
+                              int i = 0;
+                              i < 3 && i < data.categories.length;
+                              i++
+                            )
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _selectedCategory = data.categories[i];
+                                        _selectedYear[data.categories[i]] =
+                                            null;
+                                      });
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      backgroundColor:
+                                          _selectedCategory ==
+                                              data.categories[i]
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.primary
+                                          : Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainerHighest,
+                                      foregroundColor:
+                                          _selectedCategory ==
+                                              data.categories[i]
+                                          ? Colors.white
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                    ),
+                                    child: Text(
+                                      _capitalize(data.categories[i]),
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (data.categories.length > 3)
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              for (int i = 0; i < 3 && i < data.categories.length; i++)
+                              for (int i = 3; i < data.categories.length; i++)
                                 Expanded(
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                    ),
                                     child: ElevatedButton(
                                       onPressed: () {
                                         setState(() {
-                                          _selectedCategory = data.categories[i];
-                                          _selectedYear[data.categories[i]] = null;
+                                          _selectedCategory =
+                                              data.categories[i];
+                                          _selectedYear[data.categories[i]] =
+                                              null;
                                         });
                                       },
                                       style: ElevatedButton.styleFrom(
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(20),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
                                         ),
-                                        backgroundColor: _selectedCategory == data.categories[i]
-                                            ? Theme.of(context).colorScheme.primary
-                                            : Theme.of(context).colorScheme.surfaceContainerHighest,
-                                        foregroundColor: _selectedCategory == data.categories[i]
+                                        backgroundColor:
+                                            _selectedCategory ==
+                                                data.categories[i]
+                                            ? Theme.of(
+                                                context,
+                                              ).colorScheme.primary
+                                            : Theme.of(context)
+                                                  .colorScheme
+                                                  .surfaceContainerHighest,
+                                        foregroundColor:
+                                            _selectedCategory ==
+                                                data.categories[i]
                                             ? Colors.white
-                                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                                            : Theme.of(
+                                                context,
+                                              ).colorScheme.onSurfaceVariant,
                                       ),
                                       child: Text(
                                         _capitalize(data.categories[i]),
@@ -3332,91 +3432,61 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                 ),
                             ],
                           ),
-                          if (data.categories.length > 3)
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                for (int i = 3; i < data.categories.length; i++)
-                                  Expanded(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                                      child: ElevatedButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            _selectedCategory = data.categories[i];
-                                            _selectedYear[data.categories[i]] = null;
-                                          });
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          backgroundColor: _selectedCategory == data.categories[i]
-                                              ? Theme.of(context).colorScheme.primary
-                                              : Theme.of(context).colorScheme.surfaceContainerHighest,
-                                          foregroundColor: _selectedCategory == data.categories[i]
-                                              ? Colors.white
-                                              : Theme.of(context).colorScheme.onSurfaceVariant,
-                                        ),
-                                        child: Text(
-                                          _capitalize(data.categories[i]),
-                                          style: const TextStyle(fontSize: 13),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (_selectedCategory != null &&
+                        data.categoryYears[_selectedCategory]!.isNotEmpty)
+                      Builder(
+                        builder: (context) {
+                          final category = _selectedCategory!;
+                          final yearList = data.categoryYears[category]!;
+                          final current = _selectedYear[category];
+                          // Only select a year that still exists in this option set;
+                          // otherwise fall back to "All years" (0). The unique key forces
+                          // the FormField to reset its internal selection whenever the
+                          // option set changes, so a stale year can never violate the
+                          // "exactly one item" assertion.
+                          final initialValue =
+                              (current != null && yearList.contains(current))
+                              ? current
+                              : 0;
+                          return DropdownButtonFormField<int>(
+                            key: ValueKey<String>(
+                              '$category:${yearList.join(',')}',
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      if (_selectedCategory != null && data.categoryYears[_selectedCategory]!.isNotEmpty)
-                        Builder(
-                          builder: (context) {
-                            final category = _selectedCategory!;
-                            final yearList = data.categoryYears[category]!;
-                            final current = _selectedYear[category];
-                            // Only select a year that still exists in this option set;
-                            // otherwise fall back to "All years" (0). The unique key forces
-                            // the FormField to reset its internal selection whenever the
-                            // option set changes, so a stale year can never violate the
-                            // "exactly one item" assertion.
-                            final initialValue =
-                                (current != null && yearList.contains(current))
-                                    ? current
-                                    : 0;
-                            return DropdownButtonFormField<int>(
-                              key: ValueKey<String>('$category:${yearList.join(',')}'),
-                              initialValue: initialValue,
-                              decoration: InputDecoration(
-                                labelText: 'Filter by year',
-                                border: const OutlineInputBorder(),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            initialValue: initialValue,
+                            decoration: InputDecoration(
+                              labelText: 'Filter by year',
+                              border: const OutlineInputBorder(),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
                               ),
-                              items: [
-                                const DropdownMenuItem<int>(
-                                  value: 0,
-                                  child: Text('All years'),
+                            ),
+                            items: [
+                              const DropdownMenuItem<int>(
+                                value: 0,
+                                child: Text('All years'),
+                              ),
+                              for (final year in yearList)
+                                DropdownMenuItem<int>(
+                                  value: year,
+                                  child: Text('$year'),
                                 ),
-                                for (final year in yearList)
-                                  DropdownMenuItem<int>(
-                                    value: year,
-                                    child: Text('$year'),
-                                  ),
-                              ],
-                              onChanged: (value) {
-                                if (value != null) {
-                                  setState(() {
-                                    _selectedYear[category] = value;
-                                  });
-                                }
-                              },
-                            );
-                          },
-                        ),
-                      const SizedBox(height: 16),
-                    ],
-                  ),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() {
+                                  _selectedYear[category] = value;
+                                });
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    const SizedBox(height: 16),
+                  ]),
                 ),
               ),
               // Lazy-loading grid: only builds tiles that are near the viewport,
@@ -3425,23 +3495,21 @@ class _GalleryScreenState extends State<GalleryScreen> {
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
-                      childAspectRatio: 16 / 9,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final images = _filteredImages(data);
-                        return _GalleryUrlItem(
-                          image: images[index],
-                          images: images,
-                          initialIndex: index,
-                        );
-                      },
-                      childCount: _filteredImages(data).length,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 8,
+                          crossAxisSpacing: 8,
+                          childAspectRatio: 16 / 9,
+                        ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final images = _filteredImages(data);
+                      return _GalleryUrlItem(
+                        image: images[index],
+                        images: images,
+                        initialIndex: index,
+                      );
+                    }, childCount: _filteredImages(data).length),
                   ),
                 ),
               if (_selectedCategory != null && _filteredImages(data).isEmpty)
@@ -3456,7 +3524,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
                 ),
             ],
           );
-
         },
       ),
     );
@@ -3489,7 +3556,6 @@ class _GalleryData {
   final Map<String, Set<_GalleryImage>> categoryImages;
   final Map<String, List<int>> categoryYears;
 }
-
 
 String _capitalize(String input) {
   if (input.isEmpty) return input;
@@ -3554,7 +3620,11 @@ class _GalleryUrlItem extends StatelessWidget {
                 right: 12,
                 child: SafeArea(
                   child: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                     onPressed: () => Navigator.of(dialogContext).pop(),
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.black38,
@@ -3626,13 +3696,15 @@ class _GalleryUrlItem extends StatelessWidget {
               ),
             ),
 
-
             errorWidget: (context, url, error) => Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.broken_image, color: Theme.of(context).colorScheme.primary),
+                  Icon(
+                    Icons.broken_image,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                   const SizedBox(height: 8),
                   Text(image.thumbUrl),
                 ],
@@ -3683,18 +3755,13 @@ class _FullScreenImage extends StatelessWidget {
             errorWidget: (context, url, error) => Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.broken_image,
-                  size: 48,
-                  color: Colors.white54,
-                ),
+                const Icon(Icons.broken_image, size: 48, color: Colors.white54),
                 const SizedBox(height: 12),
                 Text(
                   'Unable to load image',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Colors.white54),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: Colors.white54),
                 ),
               ],
             ),
@@ -3704,7 +3771,6 @@ class _FullScreenImage extends StatelessWidget {
     );
   }
 }
-
 
 class WebsitePageScreen extends StatefulWidget {
   const WebsitePageScreen({super.key, required this.spec});
@@ -3785,28 +3851,27 @@ class _WebsitePageScreenState extends State<WebsitePageScreen> {
     return SliverPadding(
       padding: const EdgeInsets.all(16),
       sliver: SliverList(
-        delegate: SliverChildListDelegate(
-          [
-            _PageIntroCard(
-              icon: widget.spec.icon,
-              title: data.title,
-              description:
-                  data.summary.isEmpty ? widget.spec.description : data.summary,
-            ),
-            const SizedBox(height: 8),
-            ...sections.map(
-              (section) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _SectionCard(
-                  title: section.title,
-                  summary: section.summary.isEmpty
-                      ? 'Content refreshed from the website.'
-                      : section.summary,
-                ),
+        delegate: SliverChildListDelegate([
+          _PageIntroCard(
+            icon: widget.spec.icon,
+            title: data.title,
+            description: data.summary.isEmpty
+                ? widget.spec.description
+                : data.summary,
+          ),
+          const SizedBox(height: 8),
+          ...sections.map(
+            (section) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _SectionCard(
+                title: section.title,
+                summary: section.summary.isEmpty
+                    ? 'Content refreshed from the website.'
+                    : section.summary,
               ),
             ),
-          ],
-        ),
+          ),
+        ]),
       ),
     );
   }
@@ -3832,21 +3897,11 @@ class _PageIntroCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              icon,
-              size: 36,
-              color: Theme.of(context).colorScheme.primary,
-            ),
+            Icon(icon, size: 36, color: Theme.of(context).colorScheme.primary),
             const SizedBox(height: 8),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
-            Text(
-              description,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
+            Text(description, style: Theme.of(context).textTheme.bodyLarge),
           ],
         ),
       ),
@@ -3855,10 +3910,7 @@ class _PageIntroCard extends StatelessWidget {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.summary,
-  });
+  const _SectionCard({required this.title, required this.summary});
 
   final String title;
   final String summary;
@@ -3872,15 +3924,9 @@ class _SectionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
-            Text(
-              summary,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            Text(summary, style: Theme.of(context).textTheme.bodyMedium),
           ],
         ),
       ),
@@ -3908,7 +3954,9 @@ class _ErrorState extends StatelessWidget {
         child: Card(
           margin: EdgeInsets.zero,
           elevation: 0,
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.5,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
             side: BorderSide(color: theme.colorScheme.outlineVariant),
@@ -4019,13 +4067,19 @@ class _AboutScreenState extends State<AboutScreen> {
     // Offline-first: try the network, fall back to the cached copy.
     String contactRaw;
     try {
-      final contactResponse = await _dio.get<String>('$_siteBaseUrl/contact_data.json');
+      final contactResponse = await _dio.get<String>(
+        '$_siteBaseUrl/contact_data.json',
+      );
       contactRaw = contactResponse.data ?? '';
       if (contactRaw.isNotEmpty) {
-        await CacheService.instance.putWithTimestamp('about_contact', contactRaw);
+        await CacheService.instance.putWithTimestamp(
+          'about_contact',
+          contactRaw,
+        );
       }
     } on Exception {
-      contactRaw = await CacheService.instance.get(
+      contactRaw =
+          await CacheService.instance.get(
             'about_contact',
             maxAge: const Duration(days: 7),
           ) ??
@@ -4035,8 +4089,8 @@ class _AboutScreenState extends State<AboutScreen> {
     try {
       final contactJson = jsonDecode(contactRaw.isEmpty ? '{}' : contactRaw);
 
-
-      final executiveList = contactJson['executiveCommittee'] as List<dynamic>? ?? [];
+      final executiveList =
+          contactJson['executiveCommittee'] as List<dynamic>? ?? [];
       for (final member in executiveList) {
         if (member is Map<String, dynamic>) {
           final position = (member['position'] as String? ?? '').trim();
@@ -4047,7 +4101,8 @@ class _AboutScreenState extends State<AboutScreen> {
         }
       }
 
-      final committeeMembersList = contactJson['committeeMembersAuditors'] as List<dynamic>? ?? [];
+      final committeeMembersList =
+          contactJson['committeeMembersAuditors'] as List<dynamic>? ?? [];
       for (final item in committeeMembersList) {
         if (item is Map<String, dynamic>) {
           final position = (item['position'] as String? ?? '').trim();
@@ -4058,7 +4113,9 @@ class _AboutScreenState extends State<AboutScreen> {
         } else if (item is String) {
           final name = item.trim();
           if (name.isNotEmpty) {
-            committee.add(CommitteeMember(name: name, position: 'Committee Member'));
+            committee.add(
+              CommitteeMember(name: name, position: 'Committee Member'),
+            );
           }
         }
       }
@@ -4071,16 +4128,21 @@ class _AboutScreenState extends State<AboutScreen> {
       }
 
       if (contactNumber.isEmpty || contactPerson.isEmpty) {
-        final footerContact = contactJson['footerContact'] as Map<String, dynamic>?;
+        final footerContact =
+            contactJson['footerContact'] as Map<String, dynamic>?;
         if (footerContact != null) {
-          contactNumber = (footerContact['phone'] as String? ?? contactNumber).trim();
-          contactPerson = (footerContact['person'] as String? ?? contactPerson).trim();
+          contactNumber = (footerContact['phone'] as String? ?? contactNumber)
+              .trim();
+          contactPerson = (footerContact['person'] as String? ?? contactPerson)
+              .trim();
         }
       }
       if (contactEmail.isEmpty) {
-        final footerContact = contactJson['footerContact'] as Map<String, dynamic>?;
+        final footerContact =
+            contactJson['footerContact'] as Map<String, dynamic>?;
         if (footerContact != null) {
-          contactEmail = (footerContact['email'] as String? ?? contactEmail).trim();
+          contactEmail = (footerContact['email'] as String? ?? contactEmail)
+              .trim();
         }
       }
     } catch (e) {
@@ -4112,13 +4174,21 @@ class _AboutScreenState extends State<AboutScreen> {
   }
 
   String _extractAddressFromFooter(String html) {
-    final addressRegex = RegExp(r'<address[^>]*>(.*?)</address>', caseSensitive: false, dotAll: true);
+    final addressRegex = RegExp(
+      r'<address[^>]*>(.*?)</address>',
+      caseSensitive: false,
+      dotAll: true,
+    );
     final match = addressRegex.firstMatch(html);
     if (match != null) {
       return _cleanText(match.group(1) ?? '');
     }
 
-    final pRegex = RegExp(r'<p[^>]*>(.*?)</p>', caseSensitive: false, dotAll: true);
+    final pRegex = RegExp(
+      r'<p[^>]*>(.*?)</p>',
+      caseSensitive: false,
+      dotAll: true,
+    );
     for (final pMatch in pRegex.allMatches(html)) {
       final text = _cleanText(pMatch.group(1) ?? '');
       if (text.contains(RegExp(r'\d+\s+[A-Za-z\s]+,\s+[A-Za-z\s]+,\s+\d+'))) {
@@ -4137,7 +4207,9 @@ class _AboutScreenState extends State<AboutScreen> {
       final iframeEndIndex = lowerHtml.indexOf('</iframe>', iframeIndex);
       if (iframeEndIndex != -1) {
         final iframeHtml = html.substring(iframeIndex, iframeEndIndex);
-        final srcMatch = RegExp(r"""src\s*=\s*["']([^"']+)["']""").firstMatch(iframeHtml);
+        final srcMatch = RegExp(
+          r"""src\s*=\s*["']([^"']+)["']""",
+        ).firstMatch(iframeHtml);
         if (srcMatch != null) {
           final src = srcMatch.group(1) ?? '';
           if (src.contains('google.com/maps') || src.contains('maps.google')) {
@@ -4228,166 +4300,123 @@ class _AboutScreenState extends State<AboutScreen> {
     return SliverPadding(
       padding: const EdgeInsets.all(16),
       sliver: SliverList(
-        delegate: SliverChildListDelegate(
-          [
-            if (data.committee.isNotEmpty)
-              SizedBox(
-                width: double.infinity,
-                child: _ImmersiveInfoCard(
-                  gradientColors: const [
-                    Color(0xFF667EEA), // Deep periwinkle
-                    Color(0xFF764BA2), // Rich purple
-                  ],
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Office Bearers',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                        ),
+        delegate: SliverChildListDelegate([
+          if (data.committee.isNotEmpty)
+            SizedBox(
+              width: double.infinity,
+              child: _ImmersiveInfoCard(
+                gradientColors: const [
+                  Color(0xFF667EEA), // Deep periwinkle
+                  Color(0xFF764BA2), // Rich purple
+                ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Office Bearers',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
                       ),
-                      const SizedBox(height: 12),
-                      Column(
-                        children: [
-                          for (var i = 0; i < data.committee.length; i++)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      data.committee[i].name,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Column(
+                      children: [
+                        for (var i = 0; i < data.committee.length; i++)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    data.committee[i].name,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: Colors.white.withValues(alpha: 0.2),
-                                        width: 0.5,
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.2,
                                       ),
+                                      width: 0.5,
                                     ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: BackdropFilter(
-                                        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                                        child: Text(
-                                          data.committee[i].position,
-                                          style: TextStyle(
-                                            color: Colors.white.withValues(alpha: 0.9),
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: BackdropFilter(
+                                      filter: ImageFilter.blur(
+                                        sigmaX: 6,
+                                        sigmaY: 6,
+                                      ),
+                                      child: Text(
+                                        data.committee[i].position,
+                                        style: TextStyle(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.9,
                                           ),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                        ],
-                      ),
-                    ],
-                  ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            if (data.committee.isNotEmpty) const SizedBox(height: 16),
+            ),
+          if (data.committee.isNotEmpty) const SizedBox(height: 16),
 
-            if (data.address.isNotEmpty || data.contactPerson.isNotEmpty || data.contactNumber.isNotEmpty || data.contactEmail.isNotEmpty)
-              SizedBox(
-                width: double.infinity,
-                child: _ImmersiveInfoCard(
-                  gradientColors: const [
-                    Color(0xFF43E97B), // Emerald
-                    Color(0xFF38F9D7), // Mint
-                  ],
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Contact Information',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                        ),
+          if (data.address.isNotEmpty ||
+              data.contactPerson.isNotEmpty ||
+              data.contactNumber.isNotEmpty ||
+              data.contactEmail.isNotEmpty)
+            SizedBox(
+              width: double.infinity,
+              child: _ImmersiveInfoCard(
+                gradientColors: const [
+                  Color(0xFF43E97B), // Emerald
+                  Color(0xFF38F9D7), // Mint
+                ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Contact Information',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
                       ),
-                      const SizedBox(height: 12),
-                      if (data.address.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Address:',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.7),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                data.address,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (data.contactPerson.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Contact Person:',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.7),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                data.contactPerson,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (data.contactNumber.isNotEmpty)
-                        Column(
+                    ),
+                    const SizedBox(height: 12),
+                    if (data.address.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Contact Number:',
+                              'Address:',
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.7),
                                 fontSize: 12,
@@ -4397,7 +4426,7 @@ class _AboutScreenState extends State<AboutScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              data.contactNumber,
+                              data.address,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 15,
@@ -4406,71 +4435,125 @@ class _AboutScreenState extends State<AboutScreen> {
                             ),
                           ],
                         ),
-                      if (data.contactEmail.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Contact Email:',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.7),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                ),
+                      ),
+                    if (data.contactPerson.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Contact Person:',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                data.contactEmail,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              data.contactPerson,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                    ],
-                  ),
+                      ),
+                    if (data.contactNumber.isNotEmpty)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Contact Number:',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            data.contactNumber,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (data.contactEmail.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Contact Email:',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              data.contactEmail,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            if (data.address.isNotEmpty || data.contactPerson.isNotEmpty || data.contactNumber.isNotEmpty || data.contactEmail.isNotEmpty)
-              const SizedBox(height: 16),
+            ),
+          if (data.address.isNotEmpty ||
+              data.contactPerson.isNotEmpty ||
+              data.contactNumber.isNotEmpty ||
+              data.contactEmail.isNotEmpty)
+            const SizedBox(height: 16),
 
-            if (data.mapUrl.isNotEmpty)
-              Card(
-                margin: EdgeInsets.zero,
-                color: theme.colorScheme.surfaceContainerHighest,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  side: BorderSide(color: theme.colorScheme.outlineVariant),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Map to Location',
-                        style: theme.textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        height: 200,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: theme.colorScheme.outlineVariant),
+          if (data.mapUrl.isNotEmpty)
+            Card(
+              margin: EdgeInsets.zero,
+              color: theme.colorScheme.surfaceContainerHighest,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                side: BorderSide(color: theme.colorScheme.outlineVariant),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Map to Location', style: theme.textTheme.titleLarge),
+                    const SizedBox(height: 12),
+                    Container(
+                      height: 200,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: theme.colorScheme.outlineVariant,
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: WebViewWidget(
-                            controller: WebViewController()
-                              ..setJavaScriptMode(JavaScriptMode.unrestricted)
-                              ..loadHtmlString('''
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: WebViewWidget(
+                          controller: WebViewController()
+                            ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                            ..loadHtmlString('''
                                 <!DOCTYPE html>
                                 <html>
                                 <head>
@@ -4492,23 +4575,22 @@ class _AboutScreenState extends State<AboutScreen> {
                                 </body>
                                 </html>
                               '''),
-                          ),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Gurdwara Sahib Melaka is open daily.',
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Gurdwara Sahib Melaka is open daily.',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ],
                 ),
               ),
-            if (data.mapUrl.isNotEmpty) const SizedBox(height: 16),
+            ),
+          if (data.mapUrl.isNotEmpty) const SizedBox(height: 16),
 
-            _AboutFooter(currentYear: currentYear),
-          ],
-        ),
+          _AboutFooter(currentYear: currentYear),
+        ]),
       ),
     );
   }
@@ -4582,7 +4664,6 @@ class _AboutFooterState extends State<_AboutFooter> {
 }
 
 class AboutData {
-
   const AboutData({
     required this.committee,
     required this.address,
@@ -4614,17 +4695,15 @@ class AboutData {
       address: json['address'] as String? ?? '',
       contactPerson: json['contact_person'] as String? ?? '',
       mapUrl: json['map_url'] as String? ?? '',
-      contactNumber: json['contact_number'] as String? ?? json['phone'] as String? ?? '',
+      contactNumber:
+          json['contact_number'] as String? ?? json['phone'] as String? ?? '',
       contactEmail: json['email'] as String? ?? '',
     );
   }
 }
 
 class CommitteeMember {
-  const CommitteeMember({
-    required this.name,
-    required this.position,
-  });
+  const CommitteeMember({required this.name, required this.position});
 
   final String name;
   final String position;
@@ -4666,10 +4745,7 @@ class WebsitePageData {
 }
 
 class WebsiteSection {
-  const WebsiteSection({
-    required this.title,
-    required this.summary,
-  });
+  const WebsiteSection({required this.title, required this.summary});
 
   final String title;
   final String summary;

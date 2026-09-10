@@ -9,11 +9,14 @@ class SevaBookingScreen extends StatefulWidget {
   State<SevaBookingScreen> createState() => _SevaBookingScreenState();
 }
 
-class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTickerProviderStateMixin {
+class _SevaBookingScreenState extends State<SevaBookingScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final Dio _dio = Dio();
-  static const String _apiUrl = 'https://www.gurdwarasahibmelaka.com/api/submit_request.php';
-  static const String _trackUrl = 'https://www.gurdwarasahibmelaka.com/api/track_request.php';
+  static const String _apiUrl =
+      'https://www.gurdwarasahibmelaka.com/api/submit_request.php';
+  static const String _trackUrl =
+      'https://www.gurdwarasahibmelaka.com/api/track_request.php';
 
   final _langarFormKey = GlobalKey<FormState>();
   final _langarNameController = TextEditingController();
@@ -49,7 +52,9 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
 
   /// Validator: exactly 4 digits.
   String? _passcodeValidator(String? v) =>
-      (v == null || !RegExp(r'^\d{4}$').hasMatch(v.trim())) ? 'Enter exactly 4 digits' : null;
+      (v == null || !RegExp(r'^\d{4}$').hasMatch(v.trim()))
+      ? 'Enter exactly 4 digits'
+      : null;
 
   @override
   void initState() {
@@ -84,22 +89,37 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
     if (!formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
 
+    Response<dynamic> response;
     try {
-      final response = await _dio.post(_apiUrl, data: payload);
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-
-      if (response.data != null && response.data['success'] == true) {
-        _showSuccessDialog(response.data['request_id'] ?? 'REQ');
-        formKey.currentState!.reset();
-      } else {
-        _showErrorSnackBar(response.data['message'] ?? 'Failed to submit request.');
-      }
-    } catch (_) {
+      response = await _dio.post(
+        _apiUrl,
+        data: payload,
+        options: Options(
+          responseType: ResponseType.json,
+          receiveTimeout: const Duration(seconds: 15),
+        ),
+      );
+    } on DioException {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       _showErrorSnackBar('Network error. Please check your connection.');
+      return;
     }
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    final responseData = response.data;
+    if (responseData is Map && responseData['success'] == true) {
+      formKey.currentState?.reset();
+      _showSuccessDialog(responseData['request_id']?.toString() ?? 'REQ');
+      return;
+    }
+
+    final message = responseData is Map
+        ? responseData['message']?.toString()
+        : null;
+    _showErrorSnackBar(message ?? 'Failed to submit request.');
   }
 
   void _showSuccessDialog(String reqId) {
@@ -107,12 +127,14 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Request Submitted'),
-        content: Text('Your request has been received. You can check its status anytime in the Track tab using your mobile number and the 4-digit passcode you chose.'),
+        content: Text(
+          'Your request has been received. You can check its status anytime in the Track tab using your mobile number and the 4-digit passcode you chose.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('OK'),
-          )
+          ),
         ],
       ),
     );
@@ -140,7 +162,8 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
     });
 
     try {
-      final query = 'phone=${Uri.encodeComponent(phone)}&passcode=${Uri.encodeComponent(passcode)}';
+      final query =
+          'phone=${Uri.encodeComponent(phone)}&passcode=${Uri.encodeComponent(passcode)}';
       final response = await _dio.get<String>(
         '$_trackUrl?$query',
         options: Options(
@@ -167,7 +190,10 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
               .map((m) => m.cast<String, dynamic>())
               .toList();
         } else if (decoded['request'] is Map<String, dynamic>) {
-          results = [(decoded['request'] as Map<String, dynamic>).cast<String, dynamic>()];
+          results = [
+            (decoded['request'] as Map<String, dynamic>)
+                .cast<String, dynamic>(),
+          ];
         }
       }
 
@@ -176,15 +202,18 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
           _trackResults = results;
           _isTracking = false;
         });
-      } else if (decoded != null && (decoded['message'] as String?)?.isNotEmpty == true) {
+      } else if (decoded != null &&
+          (decoded['message'] as String?)?.isNotEmpty == true) {
         // Our API's own 404 "No requests found..." etc.
         setState(() {
-          _trackError = decoded?['message'] as String? ?? 'No matching requests found.';
+          _trackError =
+              decoded?['message'] as String? ?? 'No matching requests found.';
           _isTracking = false;
         });
       } else {
         setState(() {
-          _trackError = 'Tracking service is temporarily unavailable. Please try again later.';
+          _trackError =
+              'Tracking service is temporarily unavailable. Please try again later.';
           _isTracking = false;
         });
       }
@@ -195,10 +224,12 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.receiveTimeout:
         case DioExceptionType.sendTimeout:
-          msg = 'Request timed out. Please check your connection and try again.';
+          msg =
+              'Request timed out. Please check your connection and try again.';
           break;
         case DioExceptionType.connectionError:
-          msg = 'No internet connection. Please check your network and try again.';
+          msg =
+              'No internet connection. Please check your network and try again.';
           break;
         default:
           // HTTP error statuses: if the server returned OUR JSON (e.g. 404
@@ -214,7 +245,8 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
               }
             } catch (_) {}
           }
-          msg = apiMessage ??
+          msg =
+              apiMessage ??
               'Tracking service is temporarily unavailable. Please try again later.';
       }
       setState(() {
@@ -275,20 +307,32 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
           children: [
             const Text(
               'Sponsor Langar Seva',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B365D)),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1B365D),
+              ),
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _langarNameController,
-              decoration: const InputDecoration(labelText: 'Sponsor Family / Name *', border: OutlineInputBorder()),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter name' : null,
+              decoration: const InputDecoration(
+                labelText: 'Sponsor Family / Name *',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Please enter name' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _langarPhoneController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'Contact Phone Number *', border: OutlineInputBorder()),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter phone' : null,
+              decoration: const InputDecoration(
+                labelText: 'Contact Phone Number *',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Please enter phone' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -305,44 +349,79 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
             ),
             const SizedBox(height: 16),
             ListTile(
-              shape: RoundedRectangleBorder(side: const BorderSide(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-              title: Text(_selectedLangarDate == null ? 'Select Seva Date *' : 'Date: ${_selectedLangarDate!.day}/${_selectedLangarDate!.month}/${_selectedLangarDate!.year}'),
+              shape: RoundedRectangleBorder(
+                side: const BorderSide(color: Colors.grey),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              title: Text(
+                _selectedLangarDate == null
+                    ? 'Select Seva Date *'
+                    : 'Date: ${_selectedLangarDate!.day}/${_selectedLangarDate!.month}/${_selectedLangarDate!.year}',
+              ),
               trailing: const Icon(Icons.calendar_today),
               onTap: () async {
-                final d = await showDatePicker(context: context, initialDate: DateTime.now().add(const Duration(days: 1)), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+                final d = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now().add(const Duration(days: 1)),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                );
                 if (d != null) setState(() => _selectedLangarDate = d);
               },
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: _selectedMeal,
-              decoration: const InputDecoration(labelText: 'Meal Type', border: OutlineInputBorder()),
-              items: ['Breakfast', 'Lunch', 'Tea', 'Dinner', 'Full Day'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+              decoration: const InputDecoration(
+                labelText: 'Meal Type',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                'Breakfast',
+                'Lunch',
+                'Tea',
+                'Dinner',
+                'Full Day',
+              ].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
               onChanged: (v) => setState(() => _selectedMeal = v!),
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _langarNotesController,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Notes / Occasion', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: 'Notes / Occasion',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48), backgroundColor: const Color(0xFF1B365D), foregroundColor: const Color(0xFFE8A838)),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                backgroundColor: const Color(0xFF1B365D),
+                foregroundColor: const Color(0xFFE8A838),
+              ),
               onPressed: () {
-                if (_selectedLangarDate == null) { _showErrorSnackBar('Select a date'); return; }
-                _submitForm(formKey: _langarFormKey, payload: {
-                  'type': 'langar',
-                  'name': _langarNameController.text.trim(),
-                  'phone': _langarPhoneController.text.trim(),
-                  'passcode': _langarPasscodeController.text.trim(),
-                  'date': '${_selectedLangarDate!.year}-${_selectedLangarDate!.month.toString().padLeft(2, '0')}-${_selectedLangarDate!.day.toString().padLeft(2, '0')}',
-                  'meal_type': _selectedMeal,
-                  'notes': _langarNotesController.text.trim(),
-                });
+                if (_selectedLangarDate == null) {
+                  _showErrorSnackBar('Select a date');
+                  return;
+                }
+                _submitForm(
+                  formKey: _langarFormKey,
+                  payload: {
+                    'type': 'langar',
+                    'name': _langarNameController.text.trim(),
+                    'phone': _langarPhoneController.text.trim(),
+                    'passcode': _langarPasscodeController.text.trim(),
+                    'date':
+                        '${_selectedLangarDate!.year}-${_selectedLangarDate!.month.toString().padLeft(2, '0')}-${_selectedLangarDate!.day.toString().padLeft(2, '0')}',
+                    'meal_type': _selectedMeal,
+                    'notes': _langarNotesController.text.trim(),
+                  },
+                );
               },
               child: const Text('Submit Langar Request'),
-            )
+            ),
           ],
         ),
       ),
@@ -357,19 +436,34 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Hall & Path Booking', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B365D))),
+            const Text(
+              'Hall & Path Booking',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1B365D),
+              ),
+            ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _bookingNameController,
-              decoration: const InputDecoration(labelText: 'Applicant Name *', border: OutlineInputBorder()),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter name' : null,
+              decoration: const InputDecoration(
+                labelText: 'Applicant Name *',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Please enter name' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _bookingPhoneController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'Phone Number *', border: OutlineInputBorder()),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter phone' : null,
+              decoration: const InputDecoration(
+                labelText: 'Phone Number *',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Please enter phone' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -387,17 +481,38 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: _selectedEventType,
-              decoration: const InputDecoration(labelText: 'Booking Category', border: OutlineInputBorder()),
-              items: ['Akhand Path', 'Sehaj Path', 'Anand Karaj', 'Smagam', 'Hall Booking'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              decoration: const InputDecoration(
+                labelText: 'Booking Category',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                'Akhand Path',
+                'Sehaj Path',
+                'Anand Karaj',
+                'Smagam',
+                'Hall Booking',
+              ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
               onChanged: (v) => setState(() => _selectedEventType = v!),
             ),
             const SizedBox(height: 16),
             ListTile(
-              shape: RoundedRectangleBorder(side: const BorderSide(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-              title: Text(_selectedBookingDate == null ? 'Select Booking Date *' : 'Target Date: ${_selectedBookingDate!.day}/${_selectedBookingDate!.month}/${_selectedBookingDate!.year}'),
+              shape: RoundedRectangleBorder(
+                side: const BorderSide(color: Colors.grey),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              title: Text(
+                _selectedBookingDate == null
+                    ? 'Select Booking Date *'
+                    : 'Target Date: ${_selectedBookingDate!.day}/${_selectedBookingDate!.month}/${_selectedBookingDate!.year}',
+              ),
               trailing: const Icon(Icons.calendar_today),
               onTap: () async {
-                final d = await showDatePicker(context: context, initialDate: DateTime.now().add(const Duration(days: 1)), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+                final d = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now().add(const Duration(days: 1)),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                );
                 if (d != null) setState(() => _selectedBookingDate = d);
               },
             ),
@@ -405,30 +520,45 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
             TextFormField(
               controller: _bookingNotesController,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Details / Special Requests', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: 'Details / Special Requests',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48), backgroundColor: const Color(0xFF1B365D), foregroundColor: const Color(0xFFE8A838)),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                backgroundColor: const Color(0xFF1B365D),
+                foregroundColor: const Color(0xFFE8A838),
+              ),
               onPressed: () {
-                if (_selectedBookingDate == null) { _showErrorSnackBar('Select a target date'); return; }
-                _submitForm(formKey: _bookingFormKey, payload: {
-                  'type': 'booking',
-                  'name': _bookingNameController.text.trim(),
-                  'phone': _bookingPhoneController.text.trim(),
-                  'passcode': _bookingPasscodeController.text.trim(),
-                  'date': '${_selectedBookingDate!.year}-${_selectedBookingDate!.month.toString().padLeft(2, '0')}-${_selectedBookingDate!.day.toString().padLeft(2, '0')}',
-                  'event_type': _selectedEventType,
-                  'notes': _bookingNotesController.text.trim(),
-                });
+                if (_selectedBookingDate == null) {
+                  _showErrorSnackBar('Select a target date');
+                  return;
+                }
+                _submitForm(
+                  formKey: _bookingFormKey,
+                  payload: {
+                    'type': 'booking',
+                    'name': _bookingNameController.text.trim(),
+                    'phone': _bookingPhoneController.text.trim(),
+                    'passcode': _bookingPasscodeController.text.trim(),
+                    'date':
+                        '${_selectedBookingDate!.year}-${_selectedBookingDate!.month.toString().padLeft(2, '0')}-${_selectedBookingDate!.day.toString().padLeft(2, '0')}',
+                    'event_type': _selectedEventType,
+                    'notes': _bookingNotesController.text.trim(),
+                  },
+                );
               },
               child: const Text('Submit Booking Request'),
-            )
+            ),
           ],
         ),
       ),
     );
   }
+
   Widget _buildArdasTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -437,19 +567,34 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Online Ardas Request', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B365D))),
+            const Text(
+              'Online Ardas Request',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1B365D),
+              ),
+            ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _ardasNameController,
-              decoration: const InputDecoration(labelText: 'Name / Family Name *', border: OutlineInputBorder()),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter name' : null,
+              decoration: const InputDecoration(
+                labelText: 'Name / Family Name *',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Please enter name' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _ardasPhoneController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'Phone Number *', border: OutlineInputBorder()),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter phone' : null,
+              decoration: const InputDecoration(
+                labelText: 'Phone Number *',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Please enter phone' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -468,23 +613,35 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
             TextFormField(
               controller: _ardasDetailsController,
               maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Ardas Details & Occasion *', border: OutlineInputBorder()),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter details' : null,
+              decoration: const InputDecoration(
+                labelText: 'Ardas Details & Occasion *',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Please enter details'
+                  : null,
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48), backgroundColor: const Color(0xFF1B365D), foregroundColor: const Color(0xFFE8A838)),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                backgroundColor: const Color(0xFF1B365D),
+                foregroundColor: const Color(0xFFE8A838),
+              ),
               onPressed: () {
-                _submitForm(formKey: _ardasFormKey, payload: {
-                  'type': 'ardas',
-                  'name': _ardasNameController.text.trim(),
-                  'phone': _ardasPhoneController.text.trim(),
-                  'passcode': _ardasPasscodeController.text.trim(),
-                  'notes': _ardasDetailsController.text.trim(),
-                });
+                _submitForm(
+                  formKey: _ardasFormKey,
+                  payload: {
+                    'type': 'ardas',
+                    'name': _ardasNameController.text.trim(),
+                    'phone': _ardasPhoneController.text.trim(),
+                    'passcode': _ardasPasscodeController.text.trim(),
+                    'notes': _ardasDetailsController.text.trim(),
+                  },
+                );
               },
               child: const Text('Submit Ardas Request'),
-            )
+            ),
           ],
         ),
       ),
@@ -501,7 +658,11 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
           children: [
             const Text(
               'Track My Request',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B365D)),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1B365D),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -517,7 +678,9 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.phone),
               ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your mobile number' : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Please enter your mobile number'
+                  : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -559,14 +722,24 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
                   children: [
                     Icon(Icons.error_outline, color: Colors.red.shade700),
                     const SizedBox(width: 12),
-                    Expanded(child: Text(_trackError!, style: TextStyle(color: Colors.red.shade700))),
+                    Expanded(
+                      child: Text(
+                        _trackError!,
+                        style: TextStyle(color: Colors.red.shade700),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            if (!_isTracking && _trackResults != null && _trackResults!.isNotEmpty) ...[
+            if (!_isTracking &&
+                _trackResults != null &&
+                _trackResults!.isNotEmpty) ...[
               Text(
                 '${_trackResults!.length} request${_trackResults!.length == 1 ? '' : 's'} found',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 12),
               ..._trackResults!.map(_buildTrackResultCard),
@@ -580,10 +753,13 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
   Widget _buildTrackResultCard(Map<String, dynamic> r) {
     final status = (r['status'] as String? ?? 'pending').toLowerCase();
     final isDone = status == 'completed' || status == 'approved';
-    final statusColor = isDone ? Colors.green.shade700 : (status == 'rejected' ? Colors.red.shade700 : Colors.orange.shade800);
+    final statusColor = isDone
+        ? Colors.green.shade700
+        : (status == 'rejected' ? Colors.red.shade700 : Colors.orange.shade800);
     final typeLabel = (r['type'] as String? ?? '').isEmpty
         ? ''
-        : r['type'].toString()[0].toUpperCase() + r['type'].toString().substring(1);
+        : r['type'].toString()[0].toUpperCase() +
+              r['type'].toString().substring(1);
 
     return Container(
       width: double.infinity,
@@ -598,12 +774,19 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
         children: [
           Row(
             children: [
-              Icon(isDone ? Icons.check_circle : Icons.hourglass_top, color: statusColor),
+              Icon(
+                isDone ? Icons.check_circle : Icons.hourglass_top,
+                color: statusColor,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Status: ${status[0].toUpperCase()}${status.substring(1)}',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: statusColor),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: statusColor,
+                  ),
                 ),
               ),
             ],
@@ -611,13 +794,20 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
           const Divider(height: 24),
           _trackRow('Request ID', r['id']),
           if (typeLabel.isNotEmpty) _trackRow('Type', typeLabel),
-          if ((r['name'] as String? ?? '').isNotEmpty) _trackRow('Name', r['name']),
-          if ((r['date'] as String? ?? '').isNotEmpty) _trackRow('Requested Date', r['date']),
-          if ((r['meal_type'] as String? ?? '').isNotEmpty) _trackRow('Meal', r['meal_type']),
-          if ((r['event_type'] as String? ?? '').isNotEmpty) _trackRow('Event', r['event_type']),
-          if ((r['notes'] as String? ?? '').isNotEmpty) _trackRow('Notes', r['notes']),
-          if ((r['admin_remark'] as String? ?? '').isNotEmpty) _trackRow('Committee Remark', r['admin_remark']),
-          if ((r['created_at'] as String? ?? '').isNotEmpty) _trackRow('Submitted', r['created_at']),
+          if ((r['name'] as String? ?? '').isNotEmpty)
+            _trackRow('Name', r['name']),
+          if ((r['date'] as String? ?? '').isNotEmpty)
+            _trackRow('Requested Date', r['date']),
+          if ((r['meal_type'] as String? ?? '').isNotEmpty)
+            _trackRow('Meal', r['meal_type']),
+          if ((r['event_type'] as String? ?? '').isNotEmpty)
+            _trackRow('Event', r['event_type']),
+          if ((r['notes'] as String? ?? '').isNotEmpty)
+            _trackRow('Notes', r['notes']),
+          if ((r['admin_remark'] as String? ?? '').isNotEmpty)
+            _trackRow('Committee Remark', r['admin_remark']),
+          if ((r['created_at'] as String? ?? '').isNotEmpty)
+            _trackRow('Submitted', r['created_at']),
         ],
       ),
     );
@@ -631,9 +821,14 @@ class _SevaBookingScreenState extends State<SevaBookingScreen> with SingleTicker
         children: [
           SizedBox(
             width: 110,
-            child: Text('$label:', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
           ),
-          Expanded(child: Text(value.toString(), style: const TextStyle(fontSize: 13))),
+          Expanded(
+            child: Text(value.toString(), style: const TextStyle(fontSize: 13)),
+          ),
         ],
       ),
     );

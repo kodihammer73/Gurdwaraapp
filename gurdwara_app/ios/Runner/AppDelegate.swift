@@ -19,6 +19,11 @@ import FirebaseMessaging
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
+  // Clear any unread notification badge when the user opens or returns to the app.
+  override func applicationDidBecomeActive(_ application: UIApplication) {
+    application.applicationIconBadgeNumber = 0
+  }
+
   // Forward the APNs device token to Firebase Messaging
   override func application(
     _ application: UIApplication,
