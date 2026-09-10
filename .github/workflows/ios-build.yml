@@ -2,16 +2,7 @@ name: iOS Build & Publish
 
 on:
   push:
-    branches: [ main, develop ]
     tags: [ 'v*' ]
-    paths:
-      - 'gurdwara_app/lib/**'
-      - 'gurdwara_app/ios/**'
-      - 'gurdwara_app/pubspec.yaml'
-      - 'gurdwara_app/pubspec.lock'
-      - '.github/workflows/ios-build.yml'
-  pull_request:
-    branches: [ main, develop ]
     paths:
       - 'gurdwara_app/lib/**'
       - 'gurdwara_app/ios/**'
