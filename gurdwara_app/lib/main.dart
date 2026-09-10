@@ -874,7 +874,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                   size: 30,
                 ),
                 title: const Text(
-                  'Track My Request',
+                  'Book & Track Request',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -947,7 +947,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               categories: [
                 ImmersiveCategory(
                   title: 'Calendar',
-                  subtitle: 'View events & schedules',
+                  subtitle: 'View Events',
                   icon: Icons.calendar_month_rounded,
                   gradientColors: const [
                     Color(0xFF667EEA), // Deep periwinkle
@@ -957,7 +957,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                 ),
                 ImmersiveCategory(
                   title: 'Gallery',
-                  subtitle: 'Photos & memories',
+                  subtitle: 'Photos',
                   icon: Icons.photo_library_rounded,
                   gradientColors: const [
                     Color(0xFFF093FB), // Hot pink
@@ -989,7 +989,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                 ),
                 ImmersiveCategory(
                   title: 'Booking',
-                  subtitle: 'Seva, Hall Booking & Tracking',
+                  subtitle: 'Book & Track',
                   icon: Icons.volunteer_activism_rounded,
                   gradientColors: const [
                     Color(0xFFFF9A9E), // Warm Peach
@@ -999,7 +999,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                 ),
                 ImmersiveCategory(
                   title: 'Settings',
-                  subtitle: 'Preferences & theme',
+                  subtitle: 'Preferences',
                   icon: Icons.settings_rounded,
                   gradientColors: const [
                     Color(0xFF43E97B), // Emerald
