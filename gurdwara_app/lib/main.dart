@@ -399,6 +399,48 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _openDebugLog(BuildContext context) {
+    final List<String> log = NotificationService.registrationLog.value;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext pageContext) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Notification registration log'),
+            actions: <Widget>[
+              IconButton(
+                icon: const Icon(Icons.copy),
+                tooltip: 'Copy log',
+                onPressed: () async {
+                  final String body =
+                      log.isEmpty ? 'No log entries yet.' : log.join('\n');
+                  await Clipboard.setData(ClipboardData(text: body));
+                  if (pageContext.mounted) {
+                    ScaffoldMessenger.of(pageContext).showSnackBar(
+                      const SnackBar(
+                        content: Text('Log copied to clipboard'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+          body: ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: log.length,
+            itemBuilder: (BuildContext context, int index) => Text(
+              log[index],
+              style: const TextStyle(
+                  fontSize: 12, fontFamily: 'monospace', height: 1.6),
+            ),
+          ),
+        ),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
 
   Widget _buildScreen(int index) {
     switch (index) {
@@ -440,6 +482,16 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Gurdwara Sahib Melaka'),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.bug_report_outlined),
+            tooltip: 'Notification debug log',
+            onPressed: () => _openDebugLog(context),
+          ),
+        ],
+      ),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         switchInCurve: Curves.easeOut,
@@ -460,6 +512,11 @@ class _HomeScreenState extends State<HomeScreen> {
           key: ValueKey(_selectedIndex),
           child: _buildScreen(_selectedIndex),
         ),
+      ),
+      floatingActionButton: FloatingActionButton.small(
+        tooltip: 'Notification debug log',
+        onPressed: () => _openDebugLog(context),
+        child: const Icon(Icons.bug_report),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
