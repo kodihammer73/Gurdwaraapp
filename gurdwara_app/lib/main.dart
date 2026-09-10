@@ -8,6 +8,7 @@ import 'package:add_2_calendar/add_2_calendar.dart';
 import 'package:gurdwara_app/widgets/seva_booking_screen.dart';
 import 'package:gurdwara_app/widgets/prayer_reader_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -209,9 +210,10 @@ class _GurdwaraAppState extends ConsumerState<GurdwaraApp> {
 
 /// On-screen banner showing the FCM/APNs token registration status at launch.
 ///
-/// Lets the committee see on the device itself whether notifications
-/// registered successfully — and if not, the exact step/reason — instead of
-/// having to read the debug console.
+/// The collapsed banner shows the latest status line (color-coded: orange =
+/// in progress, green = success auto-hides, red = failure). Tapping it opens
+/// a detail dialog with the full timestamped registration log and a Copy
+/// button, so the committee can paste the exact diagnostics without a console.
 class _FcmStatusBanner extends StatefulWidget {
   const _FcmStatusBanner();
 
@@ -224,10 +226,15 @@ class _FcmStatusBannerState extends State<_FcmStatusBanner> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<String>(
-      valueListenable: NotificationService.registrationStatus,
-      builder: (context, status, _) {
+    return ListenableBuilder(
+      listenable: Listenable.merge(<Listenable>[
+        NotificationService.registrationStatus,
+        NotificationService.registrationLog,
+      ]),
+      builder: (BuildContext context, Widget? _) {
         if (_dismissed) return const SizedBox.shrink();
+
+        final String status = NotificationService.registrationStatus.value;
         final bool success = status.startsWith('✅');
         final bool failed = status.startsWith('❌') || status.startsWith('⚠️');
 
@@ -244,45 +251,104 @@ class _FcmStatusBannerState extends State<_FcmStatusBanner> {
             child: Padding(
               padding: const EdgeInsets.only(top: 8, left: 12, right: 12),
               child: GestureDetector(
-                onTap: () => setState(() => _dismissed = true),
+                onTap: () => _showDetails(context),
                 child: Material(
                   elevation: 6,
                   borderRadius: BorderRadius.circular(10),
                   color: failed
                       ? Colors.red.shade800
-                      : (success ? Colors.green.shade800 : Colors.orange.shade800),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (!success && !failed)
-                          const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                      : (success
+                          ? Colors.green.shade800
+                          : Colors.orange.shade800),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 360),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          if (!success && !failed)
+                            const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                          if (!success && !failed) const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              status,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 12),
                             ),
                           ),
-                        if (!success && !failed) const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            status,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                          const SizedBox(width: 6),
+                          Icon(
+                            success ? Icons.check_circle : Icons.info_outline,
+                            size: 14,
+                            color: Colors.white70,
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.close, size: 14, color: Colors.white70),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  void _showDetails(BuildContext context) {
+    final List<String> log = NotificationService.registrationLog.value;
+    final String body = log.isEmpty ? 'No log entries yet.' : log.join('\n');
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Notification registration log'),
+          contentPadding:
+              const EdgeInsets.only(left: 20, right: 20, top: 16, bottom: 8),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 360,
+            child: SingleChildScrollView(
+              child: SelectableText(
+                body,
+                style: const TextStyle(
+                    fontSize: 11, fontFamily: 'monospace', height: 1.5),
+              ),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton.icon(
+              icon: const Icon(Icons.copy, size: 16),
+              label: const Text('Copy'),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: body));
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Log copied to clipboard'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close'),
+            ),
+          ],
         );
       },
     );

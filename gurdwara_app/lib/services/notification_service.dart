@@ -40,14 +40,52 @@ class NotificationService {
   static final ValueNotifier<String> registrationStatus =
       ValueNotifier<String>('Notifications: registering…');
 
+  /// Timestamped, step-by-step registration log shown in the expandable
+  /// detail view of the on-screen banner (and copyable to clipboard), so a
+  /// failed registration can be diagnosed without a debug console.
+  static final ValueNotifier<List<String>> registrationLog =
+      ValueNotifier<List<String>>(<String>[]);
+
+  /// Appends a timestamped entry to [registrationLog] (and the debug console).
+  static void _log(String s) {
+    final String ts = DateFormat('HH:mm:ss').format(DateTime.now());
+    final String entry = '$ts  $s';
+    final List<String> updated = List<String>.from(registrationLog.value)
+      ..add(entry);
+    registrationLog.value = updated;
+    print('🔔 $entry');
+  }
+
   static void _setStatus(String s) {
     registrationStatus.value = s;
-    print('🔔 status: $s');
+    _log(s);
   }
 
 
   Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
+
+    // Reset the per-launch diagnostic log so each launch starts fresh.
+    registrationLog.value = <String>[];
+
+    // ---- Early diagnostics (app / platform / support / permission) ----
+    // Logged BEFORE the token retry so the banner's detail view always shows
+    // the full picture — including whether Apple ever issued an APNs token.
+    String appVersion = '1.0.0';
+    try {
+      final PackageInfo pkg = await PackageInfo.fromPlatform();
+      if (pkg.version.isNotEmpty) appVersion = '${pkg.version}+${pkg.buildNumber}';
+    } catch (_) {}
+    final String platform = _getPlatform();
+    _log('App version $appVersion • platform $platform');
+
+    bool supported = false;
+    try {
+      supported = await FirebaseMessaging.instance.isSupported();
+    } catch (e) {
+      _log('isSupported() error: $e');
+    }
+    _log('Firebase Messaging supported: $supported');
 
     try {
       await _localNotifications.initialize(
@@ -69,13 +107,24 @@ class NotificationService {
     await _reportDiagnostics();
 
     try {
+      final AuthorizationStatus before =
+          await FirebaseMessaging.instance.getNotificationSettings().then(
+                (s) => s.authorizationStatus,
+              );
+      _log('Notification permission (before request): $before');
       await FirebaseMessaging.instance.requestPermission(
         alert: true,
         badge: true,
         sound: true,
       );
+      final AuthorizationStatus after =
+          await FirebaseMessaging.instance.getNotificationSettings().then(
+                (s) => s.authorizationStatus,
+              );
+      _log('Notification permission (after request): $after');
     } catch (e) {
       print('⚠️ requestPermission threw: $e');
+      _log('requestPermission() error: $e');
     }
 
     // Fetch the FCM/APNs token. On iOS, the APNs token often isn't ready
@@ -90,16 +139,17 @@ class NotificationService {
     if (token != null) {
       print('FCM Token: $token');
       _prefs.setString('fcm_token', token);
-      _setStatus('Token received — sending to server…');
+      _setStatus('✅ Token received — sending to server…');
       await _registerDeviceToken(token);
     } else {
       print('⚠️ FCM/APNs token unavailable after retries (iOS may still deliver later via refresh)');
       if (!_lastApnsTokenPresent) {
-        _setStatus('⚠️ No APNs token. App likely signed WITHOUT push entitlement '
-            '(regenerate the distribution profile with Push enabled), or the APNs '
-            'key is missing in Firebase. Detail: ${_short(_lastTokenError)}');
+        _setStatus('❌ No APNs token after 8 attempts. App is signed WITHOUT the '
+            'Push Notifications entitlement — regenerate the distribution profile '
+            'with Push enabled for com.gsmelaka.mobileapp. Detail: ${_short(_lastTokenError)}');
       } else {
-        _setStatus('⚠️ APNs OK but no FCM token. Check Firebase setup / network. '
+        _setStatus('⚠️ APNs token present but no FCM token. Firebase APNs key '
+            'may be missing for com.gsmelaka.mobileapp, or network blocked. '
             'Detail: ${_short(_lastTokenError)}');
       }
     }
@@ -453,21 +503,29 @@ class NotificationService {
       if (i > 0) {
         await Future.delayed(delay);
       }
+      final int attempt = i + 1;
       try {
         // Check APNs reachability first — FCM cannot mint a token without it.
         final String? apns = await FirebaseMessaging.instance.getAPNSToken();
-        _lastApnsTokenPresent = apns != null && apns.isNotEmpty;
+        final bool apnsNowPresent = apns != null && apns.isNotEmpty;
+        if (apnsNowPresent) _lastApnsTokenPresent = true;
         final String? token = await FirebaseMessaging.instance.getToken();
         if (token != null) {
-          print('FCM/APNs token obtained on attempt ${i + 1}');
+          _log('Attempt $attempt/$maxAttempts: APNs token present — FCM token obtained');
+          print('FCM/APNs token obtained on attempt $attempt');
           return token;
         }
-        _lastTokenError = 'getToken() returned null (attempt ${i + 1})';
+        _lastTokenError = 'getToken() returned null (attempt $attempt)';
+        _log('Attempt $attempt/$maxAttempts: APNs token '
+            '${apnsNowPresent ? "present" : "MISSING"} — FCM token null');
       } catch (e) {
-        print('⚠️ getToken() threw on attempt ${i + 1}: $e');
+        print('⚠️ getToken() threw on attempt $attempt: $e');
         _lastTokenError = e.toString();
+        _log('Attempt $attempt/$maxAttempts: error — $e');
       }
     }
+    _log('Gave up after $maxAttempts attempts. APNs ever present: '
+        '$_lastApnsTokenPresent. Last error: ${_short(_lastTokenError)}');
     return null;
   }
 
