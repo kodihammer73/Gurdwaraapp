@@ -14,7 +14,7 @@
 
 Low-effort / high-impact items reusing existing infrastructure (FCM topics, `add_2_calendar`, bookings backend, SharedPreferences, Dio). None started yet — uncheck as they're picked up.
 
-- [ ] **Booking status push notifications** — when the committee updates a request in `admin.php` (Approve/Reject/Complete), push a notification to that submitter's device ("✅ Your Langar request was approved"). Closes the loop on the Track feature. Needs a way to map a request back to the submitter's FCM token (e.g. store token at submit time, or join on phone+passcode).
+- [x] **Booking status push notifications** — when the committee updates a request in `admin.php` (Approve/Reject/Complete), push a notification to that submitter's device ("✅ Your Langar request was approved"). Closes the loop on the Track feature. Implemented by storing the submitter's FCM token at submit time and firing a single-token push from `admin.php` (see session below). ⚠️ **Needs `website/admin.php`, `website/api/submit_request.php`, `website/api/send_push.php` deployed + a server round-trip test.**
 - [ ] **Per-event "Remind me"** — on an event/calendar day, one tap subscribes the device to a topic (`FirebaseMessaging.subscribeToTopic`) OR schedules a local reminder via the already-present `flutter_local_notifications`; avoids needing a new per-event backend endpoint. (Previously deferred — see note below.)
 - [ ] **Share an event** — OS share sheet / WhatsApp deep-link (`launchUrl`) to a shareable URL for a specific event, complementing the existing Call/WhatsApp quick actions.
 - [ ] **Accent-color themes** — presets (Saffron / Gold / Navy) alongside the existing light/dark/system switch in Settings.
@@ -22,6 +22,18 @@ Low-effort / high-impact items reusing existing infrastructure (FCM topics, `add
 - [ ] **Smooth "offline" reading** — cache events, prayers, and calendar data with Hive so Home/Calendar/Prayer screens work offline and refresh when back online.
 
 > Note: "Per-event Remind me" was previously deferred (2026-07/09) because no per-event opt-in endpoint existed; the Track feature was used as the interactive-functionality evidence for Apple 4.2.2. Revisit with the topic/local-reminder approach above.
+
+## Session: Booking status push notifications — closes the loop on Track (2026-09-14)
+
+- [x] **App attaches device FCM token to every booking submission** (`gurdwara_app/lib/widgets/seva_booking_screen.dart`): new `_getFcmToken()` reads the token cached at startup by `NotificationService` (`shared_preferences` key `fcm_token`), falling back to `FirebaseMessaging.instance.getToken()`; `_submitForm()` adds it to the payload as `fcm_token` (best-effort — a booking can still be submitted if no token). Added imports `firebase_messaging` + `shared_preferences`.
+- [x] **`submit_request.php` stores the optional `fcm_token`** on each new request record (validated as string; stored, never returned to the app).
+- [x] **`send_push.php` supports single-token targeting**: new optional `token` param — when present, sends only to that device (used for booking-status pushes); when absent, broadcasts to all registered devices as before. Also adds a `data.screen` hint (`bookings` for `type=booking`, else `calendar`) so tapping a booking-status push opens the Bookings tab.
+- [x] **`admin.php` pushes on status change**: new `sendStatusNotification($token,$title,$body)` helper (fire-and-forget HTTP POST to `send_push.php`, 4s timeout, no-op without a token); the `update_status` handler captures the request's `fcm_token` + `type` before saving, then for approved/rejected/completed sends "✅/❌/🏁 Your {Langar Seva|Hall Booking|Ardas} request was {status}" (with the committee remark appended to the body).
+- [x] **`main.dart` routes booking notifications**: `_handleNotificationTap` now maps `'bookings' => 2` (Bookings tab); Gallery kept on 2 (no dedicated tab) and about/settings unchanged.
+- [x] `track_request.php` unchanged — `sanitizeRequest()` already excludes `fcm_token`, phone, and passcode from public responses.
+- [x] `flutter analyze`: 0 errors (32 pre-existing `info`s only).
+- ⚠️ **Deploy `website/admin.php`, `website/api/submit_request.php`, `website/api/send_push.php` to the live server**, then round-trip test: submit a booking from the app → Approve in `admin.php` → the same device receives "✅ Your … request was approved". Note: requests submitted before this change have no `fcm_token` and won't receive status pushes (they remain trackable in-app).
+- ⚠️ No version bump / app release needed for the server-only parts, but the app-side `seva_booking_screen.dart` + `main.dart` changes require a regular app build & release.
 
 ## Session: UX polish — keyboard dismiss + hide success banner (2026-09-11)
 

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SevaBookingScreen extends StatefulWidget {
   const SevaBookingScreen({super.key});
@@ -56,6 +58,26 @@ class _SevaBookingScreenState extends State<SevaBookingScreen>
       ? 'Enter exactly 4 digits'
       : null;
 
+  /// The device's FCM token, used by the server to push booking-status updates
+  /// to this device. Reads the token cached at startup by NotificationService
+  /// (key `fcm_token`), falling back to fetching one directly. Returns null if
+  /// notifications are unavailable so a booking can still be submitted.
+  Future<String?> _getFcmToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('fcm_token');
+      if (cached != null && cached.isNotEmpty) return cached;
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null && token.isNotEmpty) {
+        await prefs.setString('fcm_token', token);
+        return token;
+      }
+    } catch (_) {
+      // Notification service unavailable — continue without a push token.
+    }
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -88,6 +110,14 @@ class _SevaBookingScreenState extends State<SevaBookingScreen>
   }) async {
     if (!formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
+
+    // Attach this device's FCM token so the server can send booking-status
+    // push notifications (approve/reject/complete) back to this device.
+    // Best-effort: a booking can still be submitted if no token is available.
+    final fcmToken = await _getFcmToken();
+    if (fcmToken != null && fcmToken.isNotEmpty) {
+      payload['fcm_token'] = fcmToken;
+    }
 
     Response<dynamic> response;
     try {

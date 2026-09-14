@@ -379,7 +379,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final index = switch (screen) {
       'home' => 0,
       'calendar' => 1,
-      'gallery' => 2,
+      'bookings' => 2,
+      'gallery' => 2, // Gallery has no bottom tab; nearest is Bookings.
       'about' => 3,
       'settings' => 4,
       _ => 1, // Default to Calendar for event notifications.
