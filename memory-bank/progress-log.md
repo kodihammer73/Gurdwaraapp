@@ -23,12 +23,15 @@ Low-effort / high-impact items reusing existing infrastructure (FCM topics, `add
 
 > Note: "Per-event Remind me" was previously deferred (2026-07/09) because no per-event opt-in endpoint existed; the Track feature was used as the interactive-functionality evidence for Apple 4.2.2. Revisit with the topic/local-reminder approach above.
 
-## Release: v1.0.19 → App Store Connect + Play Console
+## Release: v1.0.19 → App Store Connect + Play Console — ✅ DONE (2026-09-14)
 
-- **iOS**: pushed a `v1.0.19` tag (initially `1.0.19+0`) to trigger the `iOS Build & Publish` workflow (builds + signs IPA, uploads to ASC via `altool`, creates a GitHub release).
-- **Android correction (this session)**: `flutter build appbundle` at `1.0.19+0` baked in **versionCode 1** (`android/local.properties: flutter.versionCode=1`), which Play rejected as already-used (code `1` = the app's first upload). Bumped to **`1.0.19+29`** → **versionName `1.0.19`, versionCode `29`** (above prior max of 28) and rebuilt `app-release.aab` (60.5 MB). Committed on `main` (pubspec only; no new iOS tag so the running iOS build is unaffected). Upload this AAB to Play.
+- **iOS**: tag `v1.0.19` → `iOS Build & Publish` workflow → IPA uploaded to App Store Connect. **Submitted for review, awaiting Apple review.**
+- **Android correction**: `flutter build appbundle` at `1.0.19+0` baked in **versionCode 1** (`android/local.properties: flutter.versionCode=1`), which Play rejected as already-used (code `1` = the app's first upload). Bumped to **`1.0.19+29`** → **versionName `1.0.19`, versionCode `29`** (above prior max of 28), rebuilt `app-release.aab` (60.5 MB, commit `f929755`). **Published live on Play Store.**
 - Contains: booking-status push notifications (full loop) + admin switch to show/hide booking & tracking (Gallery now the Bookings-tab slot).
-- ⚠️ Deploy the accompanying server files (`website/admin.php`, `api/app_settings.php`, `api/submit_request.php`, `api/send_push.php`, `data/app_settings.json`) before the app's announcement pushes the booking notifications.
+- [x] **Server files deployed to production**: `website/admin.php`, `api/app_settings.php`, `api/submit_request.php`, `api/send_push.php`, `data/app_settings.json`.
+- [x] **Round-trip tests on live server — both passed**:
+  - Admin toggle flip (show/hide Booking & Tracking) → reflected in app. ✅
+  - Submit booking → Approve in `admin.php` → device receives push notification. ✅
 - 🧠 **Lesson for future releases**: use a real build number (`1.x.y+NN`) that keeps increasing (≤prev Android max of 28) — never `+0`, which Flutter treats as version 1.
 
 ## Session: Admin switch to show/hide Booking & Tracking + Gallery replaces the Bookings tab (2026-09-14)
