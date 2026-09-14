@@ -145,6 +145,10 @@ class _SevaBookingScreenState extends State<SevaBookingScreen>
   }
 
   Future<void> _lookupRequest() async {
+    // Release focus from the active text field so the on-screen keyboard is
+    // dismissed on mobile before the lookup runs.
+    primaryFocus?.unfocus();
+
     final phone = _trackPhoneController.text.trim();
     final passcode = _trackPasscodeController.text.trim();
     if (phone.isEmpty) {

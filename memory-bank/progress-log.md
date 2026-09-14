@@ -10,6 +10,25 @@
 - **Release procedure**: 1) bump `version:` in `gurdwara_app/pubspec.yaml` (e.g. `1.0.16+17`), 2) commit + push to `main`, 3) `git tag vX.Y.Z && git push origin vX.Y.Z` to trigger App Store Connect upload, 4) build appears in App Store Connect → TestFlight, 5) submit for review in App Store Connect (new version entry — rejected versions are not resubmitted).
 - Flutter analyze baseline: only pre-existing infos (avoid_print, deprecated 'value'); treat new **errors** as failures.
 
+## Backlog — Future Enhancements (for user interactivity)
+
+Low-effort / high-impact items reusing existing infrastructure (FCM topics, `add_2_calendar`, bookings backend, SharedPreferences, Dio). None started yet — uncheck as they're picked up.
+
+- [ ] **Booking status push notifications** — when the committee updates a request in `admin.php` (Approve/Reject/Complete), push a notification to that submitter's device ("✅ Your Langar request was approved"). Closes the loop on the Track feature. Needs a way to map a request back to the submitter's FCM token (e.g. store token at submit time, or join on phone+passcode).
+- [ ] **Per-event "Remind me"** — on an event/calendar day, one tap subscribes the device to a topic (`FirebaseMessaging.subscribeToTopic`) OR schedules a local reminder via the already-present `flutter_local_notifications`; avoids needing a new per-event backend endpoint. (Previously deferred — see note below.)
+- [ ] **Share an event** — OS share sheet / WhatsApp deep-link (`launchUrl`) to a shareable URL for a specific event, complementing the existing Call/WhatsApp quick actions.
+- [ ] **Accent-color themes** — presets (Saffron / Gold / Navy) alongside the existing light/dark/system switch in Settings.
+- [ ] **Accessibility controls** — font-size scaling and a high-contrast mode in Settings.
+- [ ] **Smooth "offline" reading** — cache events, prayers, and calendar data with Hive so Home/Calendar/Prayer screens work offline and refresh when back online.
+
+> Note: "Per-event Remind me" was previously deferred (2026-07/09) because no per-event opt-in endpoint existed; the Track feature was used as the interactive-functionality evidence for Apple 4.2.2. Revisit with the topic/local-reminder approach above.
+
+## Session: UX polish — keyboard dismiss + hide success banner (2026-09-11)
+
+- [x] **Track tab hides the keyboard on "Check Status"** (`lib/widgets/seva_booking_screen.dart`): `_lookupRequest()` now calls `primaryFocus?.unfocus();` at the very start so the OS keyboard is dismissed on iOS/Android when the user taps the button (Flutter only auto-unfocuses on touch for desktop/web). Uses the framework's `primaryFocus` top-level getter (already provided by `packages/flutter/material.dart`).
+- [x] **Hide the launch "Notifications ready (HTTP 200)" banner** (`lib/main.dart`): `_FcmStatusBannerState.build` now returns `SizedBox.shrink()` when `registrationStatus` starts with `'✅'`, so a successful FCM registration no longer shows any banner at startup. Failure (`❌`) and warning/in-progress (`⚠️`) states still display for diagnostics; removed the now-dead `_dismissed` field and its 6s auto-hide block. Note: server-side status string in `notification_service.dart` still says "Notifications ready (HTTP …)" — only its on-screen display was suppressed.
+- `flutter analyze`: no new errors (count unchanged at the pre-existing-`info` baseline; the 2 infos my first-pass import added were removed).
+
 ## Session: ITMS-90683 fix + FCM on-screen status (2026-09-09, later)
 
 - [x] **ITMS-90683 fixed**: added `NSCalendarsUsageDescription`, `NSCalendarsFullAccessUsageDescription`, `NSCalendarsWriteOnlyAccessUsageDescription` to `ios/Runner/Info.plist` (required by `add_2_calendar` plugin's EventKit references). Message: saving Gurdwara events/seva dates to calendar.

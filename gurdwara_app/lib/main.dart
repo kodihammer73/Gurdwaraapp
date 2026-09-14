@@ -216,8 +216,6 @@ class _FcmStatusBanner extends StatefulWidget {
 }
 
 class _FcmStatusBannerState extends State<_FcmStatusBanner> {
-  bool _dismissed = false;
-
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -226,18 +224,14 @@ class _FcmStatusBannerState extends State<_FcmStatusBanner> {
         NotificationService.registrationLog,
       ]),
       builder: (BuildContext context, Widget? _) {
-        if (_dismissed) return const SizedBox.shrink();
-
         final String status = NotificationService.registrationStatus.value;
         final bool success = status.startsWith('✅');
         final bool failed = status.startsWith('❌') || status.startsWith('⚠️');
 
-        // On success, auto-hide after a short pause.
-        if (success) {
-          Future.delayed(const Duration(seconds: 6), () {
-            if (mounted && !_dismissed) setState(() => _dismissed = true);
-          });
-        }
+        // A successful registration needs no action from the user, so don't
+        // surface a success banner at launch — keep the screen clean. Failures
+        // and in-progress states are still shown so they remain diagnosable.
+        if (success) return const SizedBox.shrink();
 
         return SafeArea(
           child: Align(
