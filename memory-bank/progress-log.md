@@ -23,6 +23,11 @@ Low-effort / high-impact items reusing existing infrastructure (FCM topics, `add
 
 > Note: "Per-event Remind me" was previously deferred (2026-07/09) because no per-event opt-in endpoint existed; the Track feature was used as the interactive-functionality evidence for Apple 4.2.2. Revisit with the topic/local-reminder approach above.
 
+## Release: v1.0.19+0 → App Store Connect
+
+- Bumped `pubspec.yaml` to **1.0.19+0**; pushed `origin/main`, tagged **`v1.0.19`** to trigger the `iOS Build & Publish` workflow (builds + signs IPA, uploads to ASC via `altool`, creates a GitHub release).
+- Contains: booking-status push notifications (full loop) + admin switch to show/hide booking & tracking (Gallery now the Bookings-tab slot).
+- ⚠️ Deploy the accompanying server files (`website/admin.php`, `api/app_settings.php`, `api/submit_request.php`, `api/send_push.php`, `data/app_settings.json`) before the app's announcement pushes the booking notifications.
 ## Session: Admin switch to show/hide Booking & Tracking + Gallery replaces the Bookings tab (2026-09-14)
 
 - [x] **Server-side feature flag (remote config, no app rebuild to toggle)**:
