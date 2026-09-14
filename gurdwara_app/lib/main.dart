@@ -18,6 +18,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'config/theme.dart';
+import 'services/app_settings_service.dart';
 import 'services/cache_service.dart';
 import 'services/firebase_options.dart';
 import 'services/localization_service.dart';
@@ -360,12 +361,17 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
+  /// Whether the Booking & Tracking feature is shown. Loaded from the remote
+  /// config (controllable from `admin.php` without an app rebuild).
+  bool _bookingsEnabled = true;
+
   @override
   void initState() {
     super.initState();
     // Register the deep-link handler so tapping a push notification
     // navigates to the relevant tab (e.g. Calendar for event reminders).
     NotificationService.onNotificationTap = _handleNotificationTap;
+    _loadBookingFlag();
   }
 
   @override
@@ -374,13 +380,34 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  /// Fetches the server-side "show booking & tracking" flag and hides/shows the
+  /// feature on the Home screen accordingly (Bookings is a pushed screen, not a
+  /// bottom-nav tab; Gallery now uses the tab that 'Bookings' used to).
+  Future<void> _loadBookingFlag() async {
+    final enabled = await AppSettingsService().fetchBookingsEnabled();
+    if (mounted && enabled != _bookingsEnabled) {
+      setState(() => _bookingsEnabled = enabled);
+    }
+  }
+
   /// Maps a notification screen name to a bottom-nav tab index.
   void _handleNotificationTap(String screen) {
+    if (screen == 'bookings') {
+      // Booking & Tracking is a pushed screen (no bottom tab). Route taps there
+      // only while the admin switch keeps the feature enabled.
+      if (_bookingsEnabled && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SevaBookingScreen()),
+        );
+      } else {
+        _selectTab(1); // fall back to Calendar
+      }
+      return;
+    }
     final index = switch (screen) {
       'home' => 0,
       'calendar' => 1,
-      'bookings' => 2,
-      'gallery' => 2, // Gallery has no bottom tab; nearest is Bookings.
+      'gallery' => 2, // Gallery now has a dedicated bottom tab.
       'about' => 3,
       'settings' => 4,
       _ => 1, // Default to Calendar for event notifications.
@@ -394,23 +421,30 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// Opens the Booking & Tracking screen (used by the Home banner + Explore
+  /// card). No-op when the admin has hidden the feature.
+  void _openBookings() {
+    if (!_bookingsEnabled) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SevaBookingScreen()),
+    );
+  }
+
   Widget _buildScreen(int index) {
     switch (index) {
       case 0:
         return HomeScreenContent(
           onCalendarSelected: () => _selectTab(1),
-          onBookingSelected: () => _selectTab(2),
-          onGallerySelected: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => GalleryScreen()),
-          ),
+          onBookingSelected: _openBookings,
+          onGallerySelected: () => _selectTab(2),
           onAboutSelected: () => _selectTab(3),
           onSettingsSelected: () => _selectTab(4),
+          bookingsEnabled: _bookingsEnabled,
         );
       case 1:
         return const CalendarScreen();
       case 2:
-        return const SevaBookingScreen();
+        return const GalleryScreen();
       case 3:
         return const AboutScreen();
       case 4:
@@ -418,13 +452,11 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         return HomeScreenContent(
           onCalendarSelected: () => _selectTab(1),
-          onBookingSelected: () => _selectTab(2),
-          onGallerySelected: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => GalleryScreen()),
-          ),
+          onBookingSelected: _openBookings,
+          onGallerySelected: () => _selectTab(2),
           onAboutSelected: () => _selectTab(3),
           onSettingsSelected: () => _selectTab(4),
+          bookingsEnabled: _bookingsEnabled,
         );
     }
   }
@@ -468,9 +500,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Calendar',
           ),
           NavigationDestination(
-            icon: Icon(Icons.volunteer_activism_outlined),
-            selectedIcon: Icon(Icons.volunteer_activism),
-            label: 'Bookings',
+            icon: Icon(Icons.photo_library_outlined),
+            selectedIcon: Icon(Icons.photo_library),
+            label: 'Gallery',
           ),
           NavigationDestination(
             icon: Icon(Icons.info_outline),
@@ -495,6 +527,7 @@ class HomeScreenContent extends StatefulWidget {
     required this.onBookingSelected,
     required this.onGallerySelected,
     required this.onAboutSelected,
+    required this.bookingsEnabled,
     this.onSettingsSelected,
   });
 
@@ -503,6 +536,9 @@ class HomeScreenContent extends StatefulWidget {
   final VoidCallback onGallerySelected;
   final VoidCallback onAboutSelected;
   final VoidCallback? onSettingsSelected;
+
+  /// Whether the Booking & Tracking feature is visible (server-controlled).
+  final bool bookingsEnabled;
 
   @override
   State<HomeScreenContent> createState() => _HomeScreenContentState();
@@ -855,39 +891,41 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
             ),
             const SizedBox(height: 12),
 
-            // "Track My Request" banner — surfaces the request-tracking feature
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              color: const Color(0xFF1B365D),
-              child: ListTile(
-                leading: const Icon(
-                  Icons.manage_search_rounded,
-                  color: Color(0xFFE8A838),
-                  size: 30,
+            // "Track My Request" banner — surfaces the request-tracking feature.
+            // Hidden when the admin disables Booking & Tracking in the app.
+            if (widget.bookingsEnabled)
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                title: const Text(
-                  'Book & Track Request',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                color: const Color(0xFF1B365D),
+                child: ListTile(
+                  leading: const Icon(
+                    Icons.manage_search_rounded,
+                    color: Color(0xFFE8A838),
+                    size: 30,
                   ),
+                  title: const Text(
+                    'Book & Track Request',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Check the live status of your Langar, Hall Booking or Ardas request',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                  trailing: const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Color(0xFFE8A838),
+                    size: 16,
+                  ),
+                  onTap: widget.onBookingSelected,
                 ),
-                subtitle: const Text(
-                  'Check the live status of your Langar, Hall Booking or Ardas request',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-                trailing: const Icon(
-                  Icons.arrow_forward_ios,
-                  color: Color(0xFFE8A838),
-                  size: 16,
-                ),
-                onTap: widget.onBookingSelected,
               ),
-            ),
             const SizedBox(height: 12),
 
             // "Last updated" hint (shown after a pull-to-refresh)
@@ -982,16 +1020,19 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                   ],
                   onTap: widget.onAboutSelected,
                 ),
-                ImmersiveCategory(
-                  title: 'Booking',
-                  subtitle: 'Book & Track',
-                  icon: Icons.volunteer_activism_rounded,
-                  gradientColors: const [
-                    Color(0xFFFF9A9E), // Warm Peach
-                    Color(0xFFFECFEF), // Soft Rose
-                  ],
-                  onTap: widget.onBookingSelected,
-                ),
+                // Booking & Tracking is server-controlled: hidden by the admin
+                // switch in admin.php (Bookings is now a pushed screen, not a tab).
+                if (widget.bookingsEnabled)
+                  ImmersiveCategory(
+                    title: 'Booking',
+                    subtitle: 'Book & Track',
+                    icon: Icons.volunteer_activism_rounded,
+                    gradientColors: const [
+                      Color(0xFFFF9A9E), // Warm Peach
+                      Color(0xFFFECFEF), // Soft Rose
+                    ],
+                    onTap: widget.onBookingSelected,
+                  ),
                 ImmersiveCategory(
                   title: 'Settings',
                   subtitle: 'Preferences',

@@ -23,6 +23,23 @@ Low-effort / high-impact items reusing existing infrastructure (FCM topics, `add
 
 > Note: "Per-event Remind me" was previously deferred (2026-07/09) because no per-event opt-in endpoint existed; the Track feature was used as the interactive-functionality evidence for Apple 4.2.2. Revisit with the topic/local-reminder approach above.
 
+## Session: Admin switch to show/hide Booking & Tracking + Gallery replaces the Bookings tab (2026-09-14)
+
+- [x] **Server-side feature flag (remote config, no app rebuild to toggle)**:
+  - New `website/data/app_settings.json` — single source of truth `{ "bookings_enabled": true }` (default ENABLED).
+  - New `website/api/app_settings.php` (read-only GET) — returns `{ "bookings_enabled": bool }`; `Cache-Control: no-store` so the flag is seen quickly; fail-open (missing/errored file ⇒ enabled).
+  - `website/admin.php` — new **"Booking & Tracking in the mobile app"** toggle form-switch at the top of the *Seva & Booking Requests* tab (green/red card with ON/OFF + live state text). New `loadBookingSettings()` / `saveBookingSettings()` helpers + a `toggle_bookings` POST handler writing `data/app_settings.json`, then redirect back to `?tab=requests`.
+  - Also fixed a pre-existing bug in the requests tab: the redirect querystring used `$success`/`$error` while handlers set `$successMsg`/`$errorMsg`, so status/delete/toggle confirmation messages never displayed. Normalised delete/clear/toggle branches to `$successMsg` and redirected with `$successMsg`/`$errorMsg`.
+- [x] **App consumes the flag** (`gurdwara_app/`):
+  - New `lib/services/app_settings_service.dart` (mirrors `version_check_service.dart`): `GET api/app_settings.php`, parses `bookings_enabled`, caches last value in `SharedPreferences` (`bookings_enabled` key), default `true` on network/parse error (fail-open).
+  - `lib/main.dart`: `_HomeScreenState._bookingsEnabled` loaded in `initState` via `_loadBookingFlag()`. Home navy "Track My Request" banner and the Explore "Booking" grid card are both gated by `bookingsEnabled` (added a required `bookingsEnabled` field to `HomeScreenContent`).
+- [x] **Bottom-nav change (per user request)**: the "Bookings" tab is replaced by a **Gallery** tab (`Icons.photo_library_*`); `_buildScreen(2)` now returns `GalleryScreen` (it has its own Scaffold+SliverAppBar). Booking & Tracking is now a **pushed screen**: Home `onBookingSelected` and the notification deep-link `'bookings'` push `SevaBookingScreen` via a new `_openBookings()` (no-op when the flag is off). `_handleNotificationTap` no longer maps `'bookings' => 2`.
+- [x] `flutter analyze`: 0 errors (back to the 32-`info` baseline).
+- [x] PHP lint (`D:\xampp\php\php.exe -l`): `admin.php`, `api/app_settings.php`, plus the related `submit/send_push/track_request.php` all pass "No syntax errors".
+- ⚠️ **Deploy** `website/admin.php`, `website/api/app_settings.php`, and `website/data/app_settings.json` to the live server. Round-trip test: flip the switch OFF → relaunch app → Home banner + Booking card gone, Gallery sits in the old Bookings-tab slot; flip ON → everything returns.
+- ⚠️ The app-side changes (`main.dart` + new `app_settings_service.dart`) need one app build & release. After that, changing the switch requires **no** further app releases.
+- ➕ Future idea (not built): optionally make `submit/track_request.php` also reject requests when `bookings_enabled` is false for defense-in-depth (currently hiding is UI-only by entry-point removal).
+
 ## Session: Booking status push notifications — closes the loop on Track (2026-09-14)
 
 - [x] **App attaches device FCM token to every booking submission** (`gurdwara_app/lib/widgets/seva_booking_screen.dart`): new `_getFcmToken()` reads the token cached at startup by `NotificationService` (`shared_preferences` key `fcm_token`), falling back to `FirebaseMessaging.instance.getToken()`; `_submitForm()` adds it to the payload as `fcm_token` (best-effort — a booking can still be submitted if no token). Added imports `firebase_messaging` + `shared_preferences`.
