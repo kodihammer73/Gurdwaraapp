@@ -2220,7 +2220,8 @@ DateTime? parseStartAt(String details, DateTime date) {
 String _groupKeyFor(HomepageEvent e) {
   final title = e.title.toLowerCase().trim();
   final host = e.host.toLowerCase().trim();
-  return host.isEmpty ? title : '$title|$host';
+  final details = e.details.toLowerCase().trim();
+  return host.isEmpty ? '$title|$details' : '$title|$host|$details';
 }
 
 bool _isConsecutiveDay(DateTime a, DateTime b) {
